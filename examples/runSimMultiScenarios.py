@@ -168,11 +168,6 @@ def compilar():
 def executarSim(): 
     rodCont = 1   
     numTotRod = 0 
-    #numEns = len(ensaioPrinc) if (not grafSuperf) else len(ensaioPrinc)*len(ensaioAlt)
-    #print(f'numEns = {numEns}\n')
-    #print(f'ensaios = {ensaios}\n')
-    #print(f'ensaiosAlt = {ensaiosAlt}\n')
-    #print(f'ultimachave = {ultimaChave}\n')
 
     tempoAcum = 0
     cmd = ""    
