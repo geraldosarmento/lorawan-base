@@ -1,0 +1,44 @@
+Engine: ADR-Fuzzy-MB
+	description: An Engine for ADR LoRaWAN
+InputVariable: SNR
+	description: Signal Noise Ratio
+	enabled: true
+	range: 0.0  1.0
+	lock-range: true
+	term: LOW           Triangle    0.0   0.0    0.5
+	term: IDEAL         Triangle    0.4   0.6    0.8
+	term: HIGH          Triangle    0.7   1.0    1.0
+OutputVariable: TP
+	description: TP based on Mamdani inference
+	enabled: true
+	range:   2  14
+	lock-range: false
+	aggregation: Maximum
+	defuzzifier: Centroid 100
+	default: nan
+	lock-previous: false
+    term:  LOW          Triangle   2.0   4.0  6.0
+	term:  MEDIUM       Triangle   5.0   8.0 11.0
+	term:  HIGH         Triangle  10.0  14.0 14.0
+OutputVariable: SF
+	description: SF based on Mamdani inference
+	enabled: true
+	range: 6.5  12
+	lock-range: false
+	aggregation: Maximum
+	defuzzifier: Centroid 100
+	default: nan
+	lock-previous: false	
+    term:  LOW          Triangle   6.5  6.5  9.0
+    term:  MEDIUM       Triangle   8.0  9.5 11.0
+	term:  HIGH         Triangle  10.0 11.0 12.0
+RuleBlock: mamdani
+	description: Mamdani Inference
+	enabled: true
+	conjunction: none
+	disjunction: none
+	implication: AlgebraicProduct
+	activation: General
+    rule: if SNR is HIGH then TP is LOW and SF is LOW
+	rule: if SNR is IDEAL then TP is MEDIUM and SF is MEDIUM
+	rule: if SNR is LOW then TP is HIGH and SF is HIGH

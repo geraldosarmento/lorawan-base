@@ -1,0 +1,75 @@
+#!/usr/bin/python3
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.patches import Rectangle
+
+# Definindo as dimensões do quadrado
+lado_quadrado = 8000  # em metros
+tamFonteGraf = 26
+nomeFonte       = 'Arial'  # def: "sans-serif"  #"Arial" #'Times New Roman' 
+rootPath = '.'
+towerPath = 'tower4.png'
+towerZoom = 0.12
+numGw = 3   # num de Gw = torres
+
+# Gerando coordenadas aleatórias para os pontos
+num_pontos = 400
+tol = 150
+x = np.random.uniform((-lado_quadrado/2)+tol, (lado_quadrado/2)-tol, num_pontos)
+y = np.random.uniform((-lado_quadrado/2)+tol, (lado_quadrado/2)-tol, num_pontos)
+
+# Criando o gráfico
+plt.figure(figsize=(9, 8))  # Ajuste o figsize para um gráfico quadrado
+# Ajuste o tamanho dos pontos aumentando o valor de 's'
+plt.scatter(x, y, color='lightblue', marker='.', edgecolors='black', s=1400)  # Ajuste o valor de 's' conforme necessário para o tamanho dos pontos
+#plt.title('Distribuição Aleatória de 500 Pontos em uma Área Quadrada')
+plt.xlabel('X-position (m)', fontsize=tamFonteGraf, fontname=nomeFonte)
+plt.ylabel('Y-position (m)', fontsize=tamFonteGraf, fontname=nomeFonte)
+
+# Desenhar o quadrado
+quadrado = Rectangle((-lado_quadrado/2, -lado_quadrado/2), lado_quadrado, lado_quadrado, fill=False, linestyle='--')
+plt.gca().add_patch(quadrado)
+
+# Definindo os limites e ticks dos eixos
+limite = lado_quadrado/2
+plt.xlim(-limite, limite)
+plt.ylim(-limite, limite)
+
+# Definindo os ticks dos eixos
+intervalo_ticks = lado_quadrado/4
+ticks = np.arange(-limite, limite + intervalo_ticks, intervalo_ticks)
+plt.xticks(ticks, fontsize=tamFonteGraf, fontname=nomeFonte)
+plt.yticks(ticks, fontsize=tamFonteGraf, fontname=nomeFonte)
+plt.tight_layout()
+
+# Adicionando ícones 'tower.png' em posições equidistantes usando coordenadas polares
+
+if numGw == 1:
+    x_tower = 0.0
+    y_tower = 0.0
+
+    # Adicionando a imagem da torre
+    tower_icon = plt.imread(towerPath)
+    imagebox = OffsetImage(tower_icon, zoom=towerZoom)
+    ab = AnnotationBbox(imagebox, (x_tower, y_tower), frameon=False, pad=0)
+    plt.gca().add_artist(ab)
+
+if numGw == 3:
+    for i in range(numGw):
+        theta = (2 * np.pi * i) / numGw
+        radius = lado_quadrado / (2.0 * np.sqrt(3.0))
+        x_tower = radius * np.cos(theta)
+        y_tower = radius * np.sin(theta)
+        
+        # Adicionando a imagem da torre
+        tower_icon = plt.imread(towerPath)
+        imagebox = OffsetImage(tower_icon, zoom=towerZoom)
+        ab = AnnotationBbox(imagebox, (x_tower, y_tower), frameon=False, pad=0)
+        plt.gca().add_artist(ab)
+
+plt.grid(False)
+plt.axis('equal')
+plt.tight_layout()  # Adicionando esta linha para ajustar o layout
+plt.savefig(f'{rootPath}/simArea_with_towers.png')
+
