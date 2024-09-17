@@ -3,10 +3,6 @@
 namespace ns3 {
 namespace lorawan {
 
-////////////////////////////////////////
-// LinkAdrRequest commands management //
-////////////////////////////////////////
-
 NS_LOG_COMPONENT_DEFINE ("AdrPFMB");
 
 NS_OBJECT_ENSURE_REGISTERED (AdrPFMB);
