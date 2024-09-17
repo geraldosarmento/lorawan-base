@@ -27,80 +27,99 @@ AdrPF::~AdrPF ()
 
 void
 AdrPF::AdrImplementation(uint8_t* newDataRate,
-                                uint8_t* newTxPower,
-                                Ptr<EndDeviceStatus> status)
+                         uint8_t* newTxPower,
+                         Ptr<EndDeviceStatus> status)
 {  
-  
-  
-  int numParticles = 50;
-  double processNoise = 0.005;
-  double measurementNoise = 0.01;
-  std::vector<double> SNRlist(historyRange);
-  m_deviceMargin = 0;
+    int numParticles = 20;  // Reduzido de 50 para 20 partículas
+    float processNoise = 0.005f;  // Uso de float para reduzir consumo de memória
+    float measurementNoise = 0.01f;  // Uso de float para pesos e medições
+    std::vector<float> SNRlist(historyRange);  // Uso de float no SNRlist
+    m_deviceMargin = 0;
 
-  uint8_t SF = status->GetFirstReceiveWindowSpreadingFactor();   // SF atual
-  double SNRreq = threshold[SfToDr(SF)];
-  double TP = status->GetMac()->GetTransmissionPower();   // TP atual
-  
-  //std::cout << "ADR Central implementation core activated..." << std::endl;
-    EndDeviceStatus::ReceivedPacketList packetList = status->GetReceivedPacketList ();
-    auto it = packetList.rbegin ();
-        
-    for (int i = 0; i < historyRange; i++, it++)    
-        SNRlist[i] = RxPowerToSNR (GetReceivedPower (it->second.gwList));
+    uint8_t SF = status->GetFirstReceiveWindowSpreadingFactor();   // SF atual
+    float SNRreq = threshold[SfToDr(SF)];  // Uso de float
+    float TP = status->GetMac()->GetTransmissionPower();   // TP atual 
 
-  // Ordena a lista e remove outliers 
-  /*
-  double fq, tq = 0;
-  std::sort(SNRlist.begin(), SNRlist.end());
-  fq = GetFirstQuartile(SNRlist);
-  tq = GetThirdQuartile(SNRlist);
-  RemoveOutliers(SNRlist, fq, tq);  
-  */
-
-  // Calcula a média dos SNRs como medição
-  //double measuredSNR = std::accumulate(SNRlist.begin(), SNRlist.end(), 0.0) / SNRlist.size();
-  double measuredSNR = GetMedian(SNRlist);
-
-  NodeID nodeId = int(status->GetMac()->GetDevice()->GetNode()->GetId());
-  // Inicializa partículas se necessário
-  if (nodeParticles.find(nodeId) == nodeParticles.end()) {
-      initializeParticles(nodeId, numParticles, measuredSNR, 1.0 / numParticles);
-  }
-
-  // Predição e atualização de pesos para cada partícula
-  auto& particles = nodeParticles[nodeId];
-  for (auto& particle : particles) {
-      // Previsão do próximo estado
-      particle.snr = predictSNR(particle.snr, processNoise);
-      // Atualização do peso da partícula
-      particle.weight = updateWeight(particle.snr, measuredSNR, measurementNoise);
-  }
-
-   // Normaliza os pesos das partículas
-    double totalWeight = 0.0;
-    for (const auto& particle : particles) {
-        totalWeight += particle.weight;
-    }
-    for (auto& particle : particles) {
-        particle.weight /= totalWeight;
+    EndDeviceStatus::ReceivedPacketList packetList = status->GetReceivedPacketList ();    
+    auto it = packetList.rbegin();        
+    for (int i = 0; i < historyRange && it != packetList.rend(); i++, it++) {  
+        SNRlist[i] = (float) RxPowerToSNR(GetReceivedPower(it->second.gwList));
     }
 
-   // Reamostragem de partículas
-    resampleParticles(nodeId);
+    float measuredSNR = GetMedian(SNRlist);
 
-    // Estimação de SNR como média ponderada das partículas
-    double estimatedSNR = 0.0;
-    for (const auto& particle : particles) {
-        estimatedSNR += particle.snr * particle.weight;
+    NodeID nodeId = int(status->GetMac()->GetDevice()->GetNode()->GetId());
+
+    // Inicializa as partículas se necessário
+    if (nodeParticles.find(nodeId) == nodeParticles.end()) {
+        initializeParticles(nodeId, numParticles, measuredSNR, 1.0f / numParticles);
     }
 
-    // Ajusta SF e TP com base na estimativa de SNR
-    //double SNRreq = demodulationFloor(currentDataRate);  // Suponha que demodulationFloor() seja implementado
-    double SNRmargin = estimatedSNR - SNRreq - m_deviceMargin;
-    //double SNRmargin = estimatedSNR - SNRreq;
-    int Nsteps = static_cast<int>(SNRmargin / 3.0);
+    // Loop de filtro de partículas com controle de convergência
+    int maxIter = 5;
+    int iter = 0;
+    float estimatedSNR = 0.0f;
+    float weightVarianceThreshold = 0.001f;  // Tolerância para a variância dos pesos
+    float thresholdDecay = 0.9f;  // Decaimento da tolerância a cada iteração
+    float currentWeightThreshold = weightVarianceThreshold;  // Limite dinâmico
 
+    while (iter < maxIter) {
+        auto& particles = nodeParticles[nodeId];
+
+        // Predição e atualização de pesos para cada partícula
+        for (auto& particle : particles) {
+            particle.snr = predictSNR(particle.snr, processNoise);
+            particle.weight = updateWeight(particle.snr, measuredSNR, measurementNoise);
+        }
+
+        // Normalização dos pesos
+        float totalWeight = 0.0f;
+        for (const auto& particle : particles) {
+            totalWeight += particle.weight;
+        }
+        for (auto& particle : particles) {
+            particle.weight /= totalWeight;
+        }
+
+        // Reamostragem das partículas
+        resampleParticles(nodeId);
+
+        // Estimação de SNR como média ponderada das partículas
+        estimatedSNR = 0.0f;
+        for (const auto& particle : particles) {
+            estimatedSNR += particle.snr * particle.weight;
+        }
+
+        // Calcular a variância dos pesos das partículas
+        float meanWeight = 1.0f / particles.size();
+        float weightVariance = 0.0f;
+        for (const auto& particle : particles) {
+            weightVariance += (particle.weight - meanWeight) * (particle.weight - meanWeight);
+        }
+        weightVariance /= particles.size();
+
+        // Verifica se o critério de convergência foi atingido
+        if (weightVariance <= currentWeightThreshold) {
+            break;
+        }
+
+        // Atualiza o threshold dinâmico para a próxima iteração
+        currentWeightThreshold *= thresholdDecay;
+
+        iter++;
+    }
+
+    // Reduz o número de partículas após a convergência para otimizar o uso de memória
+    auto& particles = nodeParticles[nodeId];
+    if (iter < maxIter) {  // Convergência atingida
+        particles.resize(10);  // Reduz o número de partículas para 10
+    }
+
+    // Ajuste de SF e TP com base no SNR estimado (fora do loop principal)
+    float SNRmargin = estimatedSNR - SNRreq - m_deviceMargin;
+    int Nsteps = static_cast<int>(SNRmargin / 3.0f);
+
+    // Ajusta o SF e TP com base na margem de SNR
     while (Nsteps > 0 && SF > 7) {
         SF -= 1;
         Nsteps -= 1;
@@ -114,13 +133,13 @@ AdrPF::AdrImplementation(uint8_t* newDataRate,
         Nsteps += 1;
     }
 
+    *newDataRate = SfToDr(SF);
+    *newTxPower = TP;
 
-  ////////
-
-  *newDataRate = SfToDr(SF);
-  *newTxPower = TP; 
-  
+    
 }
+
+
 
 // Função para inicializar partículas para um nó
 void 
@@ -224,8 +243,8 @@ AdrPF::RemoveOutliers(std::vector<double>& values, double q1, double q3) {
                     values.end());
 }
 
-double 
-AdrPF::GetMedian(std::vector<double> values) {
+float 
+AdrPF::GetMedian(std::vector<float> values) {
     // Sort the vector
     std::sort(values.begin(), values.end());
 

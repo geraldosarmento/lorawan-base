@@ -30,9 +30,9 @@ backupOutputDir  = True   # Realiza um backup local dos resultados
 
 
 # -= Parâmetros de Simulação =-
-numRep       = 10 if (tipoExecucao == 0) else 2
+numRep       = 10 if (tipoExecucao == 0) else 3
 sideLength   = 10000.0 #10000.0
-numPeriods   = 1 #1.125
+numPeriods   = 1.125 #1.125
 simTime      = numPeriods * 24*60*60     # Não usar tempo menor que 2h (7200s)
 #simTime      = 9600 #43200 #14400 #7200
 pktSize      = 30                      # 0 para usar valor default do módulo
@@ -55,7 +55,7 @@ dicGw        = {1:"1 Gateway"}  # Por padrão, os cenários são monoGW
 
 # "ns3::AdrPF" (dynamic) - "ns3::AdrPFMB" (static)
 #Setar o esquema de referência (proposta) na 1a posição da lista (!)
-dicAdr         = {"ns3::AdrPF":"PF-ADR(DynTrshd)", "ns3::AdrMB":"MB-ADR"} 
+dicAdr         = {"ns3::AdrPF":"PF-ADR(DynTrshd)", "ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR"} 
 #dicAdr         = {"ns3::AdrPF":"PF-ADR(DynTrshd)", "ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"} 
 #dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR" , "ns3::AdrKalman":"M-ADR", "ns3::AdrPlus":"ADR+", "ns3::AdrLorawan":"ADR"}   #Setar o esquema de referência (proposta) na 1a posição da lista
 # Esquemas: "ns3::AdrLorawan":"ADR" "ns3::AdrPlus":"ADR+" "ns3::AdrPF":"PF-ADR"  "ns3::AdrKalman":"M-ADR" "ns3::AdrMB":"MB-ADR"  "ns3::AdrKriging":"K-ADR"  "ns3::AdrEMA":"EMA-ADR" , "ns3::AdrGaussian":"G-ADR" "ns3::AdrFuzzyMB":"FADR-M", "ns3::AdrFuzzyRep":"FL-ADR"
@@ -1101,7 +1101,7 @@ def ajustarCenario(parser):
         
     # Ajustando vetor de ensaios
     if (cenarioAtual == 0 or cenarioAtual == 1):
-        ensaioPrinc = numEDList if (tipoExecucao == 0) else [200,600, 1000]  #[100,200,300] [200,400,600] [200,600,1000]
+        ensaioPrinc = numEDList if (tipoExecucao == 0) else [200,600,1000]  #[100,200,300] [200,400,600] [200,600,1000]
         multiGw = True if (cenarioAtual == 1) else None
     elif (cenarioAtual == 2):
         ensaioPrinc = [6000, 8000, 10000, 12000] if (tipoExecucao == 0) else [8000, 10000]        

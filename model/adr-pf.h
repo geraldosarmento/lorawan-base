@@ -39,8 +39,8 @@ private:
 
   // Estrutura de Partícula
   struct Particle {
-      double snr; // Estimativa do SNR
-      double weight; // Peso da partícula
+      float snr; // Estimativa do SNR
+      float weight; // Peso da partícula
   };
 
   // Mapa que armazena partículas para cada nó
@@ -56,7 +56,7 @@ private:
   double GetFirstQuartile(std::vector<double> values);
   double GetThirdQuartile(std::vector<double> values);
   void RemoveOutliers(std::vector<double>& values, double q1, double q3);
-  double GetMedian(std::vector<double> values);
+  float GetMedian(std::vector<float> values);
 
 };
 }
