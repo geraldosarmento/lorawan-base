@@ -21,10 +21,10 @@ import warnings
 # 'Tipos de cenário: 0:numED, 1:numED multGw, 2:sideLength, 3:Pkts per day, 4:Path loss Exp', '5:Gráficos de Superfície'
 
 #TO DO:
-# -
+# - 
 
 # -= Controle Geral =- 
-tipoExecucao     = 1       # Tipos:  0 - Nova Simulação | 1 - Modo Teste | 2 - Replotar gráficos  
+tipoExecucao     = 2       # Tipos:  0 - Nova Simulação | 1 - Modo Teste | 2 - Replotar gráficos  
 mobility         = True   # Caso True, vai gerar 2 cenários (e vai dobrar o número de rodadas)
 backupOutputDir  = True   # Realiza um backup local dos resultados
 
@@ -55,7 +55,7 @@ dicGw        = {1:"1 Gateway"}  # Por padrão, os cenários são monoGW
 
 # "ns3::AdrPF" (dynamic) - "ns3::AdrPFMB" (static)
 #Setar o esquema de referência (proposta) na 1a posição da lista (!)
-dicAdr         = {"ns3::AdrPF":"PF-ADR(DynTrshd)", "ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR"} 
+dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"} 
 #dicAdr         = {"ns3::AdrPF":"PF-ADR(DynTrshd)", "ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"} 
 #dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR" , "ns3::AdrKalman":"M-ADR", "ns3::AdrPlus":"ADR+", "ns3::AdrLorawan":"ADR"}   #Setar o esquema de referência (proposta) na 1a posição da lista
 # Esquemas: "ns3::AdrLorawan":"ADR" "ns3::AdrPlus":"ADR+" "ns3::AdrPF":"PF-ADR"  "ns3::AdrKalman":"M-ADR" "ns3::AdrMB":"MB-ADR"  "ns3::AdrKriging":"K-ADR"  "ns3::AdrEMA":"EMA-ADR" , "ns3::AdrGaussian":"G-ADR" "ns3::AdrFuzzyMB":"FADR-M", "ns3::AdrFuzzyRep":"FL-ADR"
@@ -72,10 +72,10 @@ modeloSpf      = 0
 
 # Controle dos Gráficos
 tamFonteGraf    = 20
-nomeFonte       = 'Arial'  # def: "sans-serif"  #"Arial" #'Times New Roman' # Arial fica bonito
+nomeFonte       = 'Times New Roman'  # def: "sans-serif"  #"Arial" #'Times New Roman' # Arial fica bonito
 marcadores      = ['^', 'v', 'p', 'o', 'x', '+', 's', '*']
 estilos         = ['-', '-.', ':', '--']
-padroesHachura  = ['/', '-', '\\', '|', '+']
+padroesHachura  = ['', '/', '-', '\\', 'x', '+']
 corPreenc       = 'dimgrey'    #  '#3B3B3B' '#1F1F1F'
 corLinhas       = ['royalblue', 'red', 'green', 'darkorange', 'mediumorchid', 'dimgrey' ] # indianred mediumorchid
 #corLinhas       = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'dimgrey'] sequência padrão de cores
@@ -678,7 +678,8 @@ def plotarGraficosPLR(mob, gw):
 
 def protarGraficoST(mob, gw, ens):
     i = 0
-    plt.figure(figsize=(12, 6)) 
+    plt.figure(figsize=(8, 6)) 
+    #plt.figure(figsize=(12, 6)) 
     plt.grid(axis='y', linestyle='--', alpha=0.7, zorder=0)
    
     for esq in dicAdr.keys():
@@ -847,35 +848,28 @@ def plotarSFFinalPorc(mob, gw, ens):
     esquemasK = list(dicAdr.keys())
 
     # Plotando o gráfico de barras
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
     
     # Primeiro desenha o grid
     ax.grid(axis='y', linestyle='--', alpha=0.7, zorder=0) 
     
-    width = 0.18  # Largura das barras
+    width = 0.185  # Largura das barras
     x = np.arange(7, 13)  # Valores de SF (7 a 12)
 
     for idx, esq in enumerate(esquemasK):
-        #for ens in ensaioPrinc:
         if tipoExecucao != 2:
             media_por_sf = obterSFFinalEsquema(mob, gw, esq, ens)
         else:
-            # Carregar o arquivo JSON como DataFrame
             nomeArq = f"{outputPath}{lstCenarios[cenarioAtual]}-SFFinal{esq}{ens}-MbltProb{mob}-{gw}Gw.json"
             media_por_sf_df = pd.read_json(nomeArq, orient='records')
-
-            # Converte o DataFrame de volta para um dicionário para garantir acesso por SF
             media_por_sf = media_por_sf_df.set_index('SF')['Percentage'].to_dict()
 
-        # Adicionar os valores de SF ao dicionário dados_sf
         for sf in range(7, 13):
             if sf in media_por_sf:
                 dados_sf[sf].append(media_por_sf[sf])
             else:
-                # Caso não haja dados para aquele SF, adicionar 0 (ou outro valor padrão)
                 dados_sf[sf].append(0)
 
-        # Adiciona as barras com cores e hachuras diferentes para cada esquema
         ax.bar(x + idx * width, [dados_sf[sf][idx] for sf in range(7, 13)], width=width, edgecolor='black',
             color=corLinhas[idx], label=f'{dicAdr[esq]}', hatch=padroesHachura[idx % len(padroesHachura)], zorder=3)
 
@@ -885,21 +879,23 @@ def plotarSFFinalPorc(mob, gw, ens):
 
     # Configurações dos ticks do eixo X
     ax.set_xticks(x + width * (len(esquemasK) - 1) / 2)
-    ax.set_xticklabels(range(7, 13), fontsize=tamFonteGraf, fontname=nomeFonte)  # Ajusta o tamanho da fonte
+    ax.set_xticklabels(range(7, 13), fontsize=tamFonteGraf, fontname=nomeFonte)
+
+    # Calcula o maior valor e ajusta o limite do eixo Y
+    max_value = max(max(dados_sf[sf]) for sf in range(7, 13))
+    y_upper_limit = np.ceil(max_value / 10) * 10  # Arredonda para a dezena mais próxima
+    ax.set_ylim(0, y_upper_limit)
 
     # Configurações dos ticks do eixo Y
-    ax.set_yticks(np.arange(0, 101, 10))  # Define os ticks do eixo Y de 10 em 10
-    ax.tick_params(axis='y', labelsize=tamFonteGraf)  # Ajusta o tamanho da fonte dos valores no eixo Y
-    
-    # Ajusta os valores dos eixos X e Y
-    plt.xticks(fontsize=tamFonteGraf, fontname=nomeFonte)  # Tamanho da fonte dos valores no eixo X
-    plt.yticks(fontsize=tamFonteGraf, fontname=nomeFonte)  # Tamanho da fonte dos valores no eixo Y
-    
-    ax.set_ylim(0, 100)
+    ax.set_yticks(np.arange(0, y_upper_limit + 10, 10))  # Define os ticks do eixo Y
+    ax.tick_params(axis='y', labelsize=tamFonteGraf)
+
+    plt.xticks(fontsize=tamFonteGraf, fontname=nomeFonte)
+    plt.yticks(fontsize=tamFonteGraf, fontname=nomeFonte)
 
     # Adiciona a legenda
     legend_font = FontProperties(family=nomeFonte, style='normal', size=tamFonteGraf-4)
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', prop=legend_font, handlelength=1.4, handleheight=1.2)
+    ax.legend(loc='upper center', prop=legend_font, handlelength=1.4, handleheight=1.2)
 
     plt.tight_layout()
     plt.savefig(f"{outputPath}{lstCenarios[cenarioAtual]}-SFFinal{ens}-MbltProb{mob}-{gw}Gw.png")

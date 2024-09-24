@@ -56,7 +56,7 @@ AdrPF::AdrImplementation(uint8_t* newDataRate,
     }
 
     // Loop de filtro de partículas com controle de convergência
-    int maxIter = 5;
+    int maxIter = 200;
     int iter = 0;
     float estimatedSNR = 0.0f;
     float weightVarianceThreshold = 0.001f;  // Tolerância para a variância dos pesos
@@ -100,14 +100,15 @@ AdrPF::AdrImplementation(uint8_t* newDataRate,
 
         // Verifica se o critério de convergência foi atingido
         if (weightVariance <= currentWeightThreshold) {
-            break;
+			//std::cout << "Critério de convergência atingido em iter #" << iter << std::endl;
+            break;            
         }
 
         // Atualiza o threshold dinâmico para a próxima iteração
-        currentWeightThreshold *= thresholdDecay;
-
+        currentWeightThreshold *= thresholdDecay;		
         iter++;
     }
+    //std::cout << "Valor final de iter #" << iter << std::endl;
 
     // Reduz o número de partículas após a convergência para otimizar o uso de memória
     auto& particles = nodeParticles[nodeId];
