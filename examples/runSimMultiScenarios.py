@@ -24,8 +24,8 @@ import warnings
 # - 
 
 # -= Controle Geral =- 
-tipoExecucao     = 0      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida
-novaSim          = False   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
+tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida
+novaSim          = True   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
 mobility         = True   # Caso True, vai gerar 2 cenários (e vai dobrar o número de rodadas)
 backupOutputDir  = False  # Realiza um backup local dos resultados
 
@@ -55,8 +55,8 @@ dicGw        = {1:"1 Gateway"}  # Por padrão, os cenários são monoGW
 # -= DICS 'n LISTS =-
 
 #Setar o esquema de referência (proposta) na 1a posição da lista (!)
-#dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrLorawan":"ADR"} 
-dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"} 
+dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrLorawan":"ADR"} 
+#dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"} 
 #dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR" , "ns3::AdrKalman":"M-ADR", "ns3::AdrPlus":"ADR+", "ns3::AdrLorawan":"ADR"}   #Setar o esquema de referência (proposta) na 1a posição da lista
 # Esquemas: "ns3::AdrLorawan":"ADR" "ns3::AdrPlus":"ADR+" "ns3::AdrPF":"PF-ADR"  "ns3::AdrKalman":"M-ADR" "ns3::AdrMB":"MB-ADR"  "ns3::AdrKriging":"K-ADR"  "ns3::AdrEMA":"EMA-ADR" , "ns3::AdrGaussian":"G-ADR" "ns3::AdrFuzzyMB":"FADR-M", "ns3::AdrFuzzyRep":"FL-ADR"
 dicMobil       = {"1.0":"Mobile"} if (mobility) else {"0.0":"Static"}  # "0.5":"Semi-Mobile"
@@ -87,7 +87,7 @@ serieTemp       = True          # Se exibir ou não gráficos de Série Temporal
 intervaloST     = 2             # Intervalo no eixo x nos gráficos de ST em h (horas)
 SFFinalED       = True         # Se plotar ou não gráficos com as atribuições finais de SF por ED
 energiaPorED    = True         # Se exibir o consumo médio por ED ou global na métrica EneCon
-efEnergEmKbits  = False         # Se exibir a medida de eficEnerg em Kbits/J ou bits/J
+efEnergEmKbits  = True         # Se exibir a medida de eficEnerg em Kbits/J ou bits/J
 multGWPar       = True          # MGP - modo MultGwPar para gerar gráficos pareados
 
 # -= ESTRUTURAS DE DADOS DINÂMICAS =-
@@ -424,11 +424,7 @@ def atualizarDados(esq, ens, ensAlt):
         pacReceb  = arq.iloc[:,1]
         totEneCon = arq.iloc[:,-2]                
 
-        if (efEnergEmKbits):
-            amostrasEneEff.append( ((pacReceb*pktSize*8) / totEneCon) / 1000 )  #Transformando em Kbits/J
-        else:
-            amostrasEneEff.append( (pacReceb*pktSize*8) / totEneCon )  #Transformando em bits/J
-
+        amostrasEneEff.append( (pacReceb*pktSize*8) / totEneCon )  #Transformando em bits/J
         #amostrasEneEff.append( pacReceb / totEneCon )  #Transformando em pcts/J
 
         if (len(amostrasEneEff) == numRep):
@@ -443,7 +439,7 @@ def atualizarDados(esq, ens, ensAlt):
                         pivotEneEff = 0
             amostrasEneEff = [] 
 
-#TO DO...
+
 def atualizarDadosPLR(esq, ens):
     global dfPLR_I, dfPLR_R, dfPLR_T, dfPLR_S
     global amostrasPLR_I, amostrasPLR_R, amostrasPLR_T, amostrasPLR_S
@@ -482,12 +478,8 @@ def atualizarDadosPLR(esq, ens):
                 pivotPLR_I += 1
                 pivotPLR_R += 1                
                 pivotPLR_S += 1
-                pivotPLR_T += 1
-    
-    #print(f'dfPLR_I: {dfPLR_I}')
-    #print(f'dfPLR_R: {dfPLR_R}')
-    #print(f'dfPLR_T: {dfPLR_T}')
-    #print(f'dfPLR_S: {dfPLR_S}')
+                pivotPLR_T += 1   
+   
 
 def atualizarDadosST (mob, gw, esq, ens, rep):
     global dfPDR_ST, dfEne_ST, amostrasPDR_ST, amostrasEne_ST
@@ -500,20 +492,13 @@ def atualizarDadosST (mob, gw, esq, ens, rep):
     # Apaga a primeira linha do DF, pra evitar a divisão por 0
     arqPDR = arqPDR.drop(0)
    
-    #dfPDR_ST[dicAdr[esq]] = [[] for _ in range(len(dfPDR_ST))]
     amostrasPDR_ST.append( (arqPDR[2]/arqPDR[1]).tolist() )
-   
-    #print(f'amostrasPDR_ST: {amostrasPDR_ST}')
-    #print(f'dfPDR_ST antes: {dfPDR_ST}')
    
     for i in range(0,len(dfPDR_ST['Tempo'])):
         celulaPDR = dfPDR_ST.at[i,dicAdr[esq]]   
         celulaPDR.append(amostrasPDR_ST[0][i])   
         dfPDR_ST.at[i,dicAdr[esq]] = celulaPDR
-        #print(f'amostrasPDR_ST: {amostrasPDR_ST}\n')
-        #print(f'celulaPDR: {celulaPDR}\n')
-        #print(f'i: {i}\n')
-
+       
     amostrasPDR_ST = []   
     
     if (rep == numRep-1):
@@ -535,9 +520,9 @@ def plotarGraficos(mob, gw, metrica):
     dfMedia = dados.map(lambda lista: np.mean(lista))
     dfDP = dados.map(lambda lista: np.std(lista, ddof=1))   
 
-    #if metrica == "EneEff" and efEnergEmKbits:
-    #    dfMedia /= 1000
-    #    dfDP /= 1000
+    if metrica == "EneEff" and efEnergEmKbits:
+        dfMedia /= 1000
+        dfDP /= 1000
 
     z = norm.ppf(areaIC)
 
@@ -558,9 +543,7 @@ def plotarGraficos(mob, gw, metrica):
     
     plt.xticks(eixo_x, fontsize=tamFonteGraf, fontname=nomeFonte)
     plt.yticks(fontsize=tamFonteGraf, fontname=nomeFonte)
-    plt.grid(axis='y', linestyle='--')
-
-    #plt.title(f'{dicMetric[metrica]} with {gw} GW ({dicMobil[mob]} ED)', fontweight="bold", fontname=nomeFonte)    
+    plt.grid(axis='y', linestyle='--')   
 
     plt.xlabel(lstRotulos[cenarioAtual], fontsize=tamFonteGraf, fontname=nomeFonte)
     plt.ylabel(dicMetric[metrica], fontsize=tamFonteGraf, fontname=nomeFonte)      
@@ -591,9 +574,9 @@ def plotarGraficosMultGWPar(mob, metrica):
         dfDP = dados.map(lambda lista: np.std(lista, ddof=1))   
         z = norm.ppf(areaIC)
 
-        #if metrica == "EneEff" and efEnergEmKbits:
-        #    dfMedia /= 1000
-        #    dfDP /= 1000
+        if metrica == "EneEff" and efEnergEmKbits:
+            dfMedia /= 1000
+            dfDP /= 1000
 
         marc = marcadores
         if not exibirMarc:
@@ -742,8 +725,8 @@ def plotarSuperficie(mob, gw, met, esq):
     # Calcular a média dos valores de PDR em cada célula, lidando com None ou valores não numéricos
     valores = dados.iloc[:, 1:].applymap(lambda x: np.mean(x) if isinstance(x, list) else np.nan).values
 
-    #if met == "EneEff" and efEnergEmKbits:        
-    #    valores /= 1000
+    if met == "EneEff" and efEnergEmKbits:        
+        valores /= 1000
 
     # Criar grid para interpolar os valores e suavizar a superfície
     X, Y = np.meshgrid(eixoX, eixoY)
@@ -1038,6 +1021,10 @@ def obterRelatorio(relFinal=False):
         dfMedia = dados.map(lambda lista: np.mean(lista))
         dfDP = dados.map(lambda lista: np.std(lista, ddof=1))
 
+        if met == "EneEff" and efEnergEmKbits:
+            dfMedia /= 1000
+            dfDP /= 1000
+
         # Valor crítico para um intervalo de confiança de 95%
         z = norm.ppf(areaIC)  # 0.975 para a área de 0.025 em cada cauda
         # Cálculo do erro do intervalo de confiança
@@ -1055,7 +1042,7 @@ def obterRelatorio(relFinal=False):
         if relFinal:
             for i in range(1, dfMedia.shape[1]):            
                 resultado = dfMedia.iloc[:, 0] - dfMedia.iloc[:, i]
-                resultadoPerc = (dfMedia.iloc[:, i] - dfMedia.iloc[:, 0])/dfMedia.iloc[:, i] * 100
+                resultadoPerc = (dfMedia.iloc[:, 0]-dfMedia.iloc[:, i])/dfMedia.iloc[:, i] * 100
                 resultadoPerc = round(resultadoPerc,5)
                 meanResPer    = resultadoPerc.mean()
                 resultadoPerc = resultadoPerc.astype(str) + '%'
