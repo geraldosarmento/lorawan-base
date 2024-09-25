@@ -631,7 +631,7 @@ def plotarGraficosMultGWPar(mob, metrica):
 
 def plotarGraficosPLR(mob, gw):    
     colors = ['lightslategray', 'lightcoral', 'lightgreen', 'orange', 'cyan']
-
+        
     eixo_x = dfPDR.iloc[:, 0]
     dfMedia_PDR = dfPDR.map(lambda lista: np.mean(lista))
     dfMedia_PLR_I = dfPLR_I.map(lambda lista: np.mean(lista))
@@ -665,9 +665,9 @@ def plotarGraficosPLR(mob, gw):
         ax.yaxis.set_major_formatter(ticker.StrMethodFormatter("{x:.1f}"))         
          
         # Legenda
-        legend_font = FontProperties(family=nomeFonte, style='normal', size=tamFonteGraf)
+        legend_font = FontProperties(family=nomeFonte, style='normal', size=tamFonteGraf-2)
         handles, labels = ax.get_legend_handles_labels()
-        ax.legend(reversed(handles), reversed(labels), loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=5, fontsize='large', labelspacing=0.1, handlelength=2.8, handleheight=1.8, frameon=False, prop=legend_font)
+        ax.legend(reversed(handles), reversed(labels), loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=5, fontsize='large', handletextpad=0.5, handlelength=1.5, handleheight=1.8, frameon=False, prop=legend_font)
 
         # Salva o gráfico em um arquivo
         plt.savefig(f"{outputPath}{lstCenarios[cenarioAtual]}-PLRbarra-{column}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
@@ -1168,7 +1168,8 @@ def ajustarComandoSpf(mob, gw, esq, ens, ensAlt):
     return cmd
 
 def main():    
-    global dfPDR, dfCPSR, dfEneCon, dfEneEff, dfLatencia, dfPDR_ST   
+    #global dfPDR, dfCPSR, dfEneCon, dfEneEff, dfLatencia, dfPDR_ST   
+     
 
     parser = argparse.ArgumentParser(description='Run simulations regarding different scenarios')
     ajustarCenario(parser)
@@ -1199,6 +1200,8 @@ def main():
                     for ens in ensaioPrinc:
                         plotarSFFinalPorc(mob, gw, ens)
                         protarGraficoST(mob, gw, ens) if serieTemp else None
+                    carregarDadosPLRArq(mob, gw) if (gerarPLR) else None  ###
+                    plotarGraficosPLR(mob, gw) if (gerarPLR) else None  ###
                 else:
                     for met in dicMetric.keys():
                         for esq in dicAdr.keys():
