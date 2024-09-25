@@ -24,17 +24,18 @@ import warnings
 # - 
 
 # -= Controle Geral =- 
-tipoExecucao     = 2       # Tipos:  0 - Nova Simulação | 1 - Modo Teste | 2 - Replotar gráficos  
+tipoExecucao     = 0      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida
+novaSim          = False   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
 mobility         = True   # Caso True, vai gerar 2 cenários (e vai dobrar o número de rodadas)
-backupOutputDir  = True   # Realiza um backup local dos resultados
+backupOutputDir  = False  # Realiza um backup local dos resultados
 
 
 # -= Parâmetros de Simulação =-
-numRep       = 10 if (tipoExecucao == 0) else 3
+numRep       = 10 if (tipoExecucao == 0) else 2
 sideLength   = 10000.0 #10000.0
 numPeriods   = 1.125 #1.125
 simTime      = numPeriods * 24*60*60     # Não usar tempo menor que 2h (7200s)
-#simTime      = 9600 #43200 #14400 #7200
+simTime      = 9600 #43200 #14400 #7200
 pktSize      = 30                      # 0 para usar valor default do módulo
 pktsPerDay   = 144
 pktsPerSecs  = pktsPerDay/86400
@@ -53,10 +54,9 @@ dicGw        = {1:"1 Gateway"}  # Por padrão, os cenários são monoGW
 
 # -= DICS 'n LISTS =-
 
-# "ns3::AdrPF" (dynamic) - "ns3::AdrPFMB" (static)
 #Setar o esquema de referência (proposta) na 1a posição da lista (!)
+#dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrLorawan":"ADR"} 
 dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"} 
-#dicAdr         = {"ns3::AdrPF":"PF-ADR(DynTrshd)", "ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"} 
 #dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR" , "ns3::AdrKalman":"M-ADR", "ns3::AdrPlus":"ADR+", "ns3::AdrLorawan":"ADR"}   #Setar o esquema de referência (proposta) na 1a posição da lista
 # Esquemas: "ns3::AdrLorawan":"ADR" "ns3::AdrPlus":"ADR+" "ns3::AdrPF":"PF-ADR"  "ns3::AdrKalman":"M-ADR" "ns3::AdrMB":"MB-ADR"  "ns3::AdrKriging":"K-ADR"  "ns3::AdrEMA":"EMA-ADR" , "ns3::AdrGaussian":"G-ADR" "ns3::AdrFuzzyMB":"FADR-M", "ns3::AdrFuzzyRep":"FL-ADR"
 dicMobil       = {"1.0":"Mobile"} if (mobility) else {"0.0":"Static"}  # "0.5":"Semi-Mobile"
@@ -87,7 +87,7 @@ serieTemp       = True          # Se exibir ou não gráficos de Série Temporal
 intervaloST     = 2             # Intervalo no eixo x nos gráficos de ST em h (horas)
 SFFinalED       = True         # Se plotar ou não gráficos com as atribuições finais de SF por ED
 energiaPorED    = True         # Se exibir o consumo médio por ED ou global na métrica EneCon
-efEnergEmKbits  = True         # Se exibir a medida de eficEnerg em Kbits/J ou bits/J
+efEnergEmKbits  = False         # Se exibir a medida de eficEnerg em Kbits/J ou bits/J
 multGWPar       = True          # MGP - modo MultGwPar para gerar gráficos pareados
 
 # -= ESTRUTURAS DE DADOS DINÂMICAS =-
@@ -204,9 +204,10 @@ def executarSim():
                             atualizarDadosPLR(esq, ensPrinc) if (not grafSuperf) else None                            
                             atualizarDadosST(mob, gw, esq, ensPrinc, rep) if (serieTemp and (not grafSuperf)) else None
                             obterSFFinalEsquema(mob, gw, esq, ensPrinc)
-                        print(obterRelatorio(cmd))                     
+                        #print(obterRelatorio(cmd))
                     plotarSFFinalporED(mob, gw, esq) if (SFFinalED and (not mobility) and (not grafSuperf)) else None                                
                     reiniciarEstruturasST()
+                print(obterRelatorio(cmd))
                 if (grafSuperf):
                     for met in dicMetric.keys():
                         plotarSuperficie(mob, gw, met, esq)            
@@ -423,7 +424,11 @@ def atualizarDados(esq, ens, ensAlt):
         pacReceb  = arq.iloc[:,1]
         totEneCon = arq.iloc[:,-2]                
 
-        amostrasEneEff.append( (pacReceb*pktSize*8) / totEneCon )  #Transformando em bits/J
+        if (efEnergEmKbits):
+            amostrasEneEff.append( ((pacReceb*pktSize*8) / totEneCon) / 1000 )  #Transformando em Kbits/J
+        else:
+            amostrasEneEff.append( (pacReceb*pktSize*8) / totEneCon )  #Transformando em bits/J
+
         #amostrasEneEff.append( pacReceb / totEneCon )  #Transformando em pcts/J
 
         if (len(amostrasEneEff) == numRep):
@@ -530,9 +535,9 @@ def plotarGraficos(mob, gw, metrica):
     dfMedia = dados.map(lambda lista: np.mean(lista))
     dfDP = dados.map(lambda lista: np.std(lista, ddof=1))   
 
-    if metrica == "EneEff" and efEnergEmKbits:
-        dfMedia /= 1000
-        dfDP /= 1000
+    #if metrica == "EneEff" and efEnergEmKbits:
+    #    dfMedia /= 1000
+    #    dfDP /= 1000
 
     z = norm.ppf(areaIC)
 
@@ -586,9 +591,9 @@ def plotarGraficosMultGWPar(mob, metrica):
         dfDP = dados.map(lambda lista: np.std(lista, ddof=1))   
         z = norm.ppf(areaIC)
 
-        if metrica == "EneEff" and efEnergEmKbits:
-            dfMedia /= 1000
-            dfDP /= 1000
+        #if metrica == "EneEff" and efEnergEmKbits:
+        #    dfMedia /= 1000
+        #    dfDP /= 1000
 
         marc = marcadores
         if not exibirMarc:
@@ -716,7 +721,8 @@ def protarGraficoST(mob, gw, ens):
     
 
 def plotarSuperficie(mob, gw, met, esq):
-    if tipoExecucao == 2:
+    #if tipoExecucao == 2:
+    if (not novaSim):
         dados = carregarDadosArq(f"{outputPath}{lstCenarios[cenarioAtual]}-{met}-{esq}-MbltProb{mob}-{gw}Gw.json")
     else:
         nomeDF = f"df{met}"
@@ -736,8 +742,8 @@ def plotarSuperficie(mob, gw, met, esq):
     # Calcular a média dos valores de PDR em cada célula, lidando com None ou valores não numéricos
     valores = dados.iloc[:, 1:].applymap(lambda x: np.mean(x) if isinstance(x, list) else np.nan).values
 
-    if met == "EneEff" and efEnergEmKbits:        
-        valores /= 1000
+    #if met == "EneEff" and efEnergEmKbits:        
+    #    valores /= 1000
 
     # Criar grid para interpolar os valores e suavizar a superfície
     X, Y = np.meshgrid(eixoX, eixoY)
@@ -857,7 +863,8 @@ def plotarSFFinalPorc(mob, gw, ens):
     x = np.arange(7, 13)  # Valores de SF (7 a 12)
 
     for idx, esq in enumerate(esquemasK):
-        if tipoExecucao != 2:
+        #if tipoExecucao != 2:
+        if (novaSim):
             media_por_sf = obterSFFinalEsquema(mob, gw, esq, ens)
         else:
             nomeArq = f"{outputPath}{lstCenarios[cenarioAtual]}-SFFinal{esq}{ens}-MbltProb{mob}-{gw}Gw.json"
@@ -1048,16 +1055,24 @@ def obterRelatorio(relFinal=False):
         if relFinal:
             for i in range(1, dfMedia.shape[1]):            
                 resultado = dfMedia.iloc[:, 0] - dfMedia.iloc[:, i]
-                saida += f"\nDiferença de {met} entre {dfMedia.columns[0]} e {dfMedia.columns[i]}:\n{resultado}\n"
-                saida += f"===> Valor médio: {resultado.mean()} \n"                
+                resultadoPerc = (dfMedia.iloc[:, i] - dfMedia.iloc[:, 0])/dfMedia.iloc[:, i] * 100
+                resultadoPerc = round(resultadoPerc,5)
+                meanResPer    = resultadoPerc.mean()
+                resultadoPerc = resultadoPerc.astype(str) + '%'
+                saida += f"\nDiferença de {met} entre {dfMedia.columns[0]} e {dfMedia.columns[i]}:\n{round(resultado,5)}\n"
+                saida += f"\nDiferença perc.  de {met} entre {dfMedia.columns[0]} e {dfMedia.columns[i]}:\n{resultadoPerc} \n"
+                saida += f"===> Valor médio: {round(resultado.mean(),5)} \n"                
+                saida += f"===> Valor médio (perc): {round(meanResPer,5)}% \n" 
     saida += ":::::::::::::::::::::::::::::::::::::::::::::::::::::\n"
-
+    
     return saida
 
 def gerarRelatorioFinal(mob, gw, cmd=""):
     global outputFile
 
     outputFile = f"{outputPath}RELATORIO_FINAL_MbltProb{mob}_{gw}Gw.dat"
+    if (not novaSim):
+        outputFile = f"{outputPath}RELATORIO_FINAL_v2_MbltProb{mob}_{gw}Gw.dat"
     arquivo = open(outputFile, "w")    
     arquivo.write(f":::::::::::::::::::::::::::::::::::::::::::::::::::::\n")
     arquivo.write(f"::::  RESULTADO FINAL - Mblt prob:{mob} {gw}Gw  ::::\n")
@@ -1075,9 +1090,10 @@ def gerarRelatorioFinal(mob, gw, cmd=""):
             saidaSF += f":::::::::::::::::::::::::::::::::::::::::::::::::::::\n"
             arquivo.write(saidaSF)        
     '''
-    arquivo.write(f":::::::::::::::::::::::::::::::::::::::::::::::::::::\n")    
-    arquivo.write(f"Último comando: {cmd}")
-    arquivo.write(f":::::::::::::::::::::::::::::::::::::::::::::::::::::\n")
+    if (cmd != ""):
+        arquivo.write(f":::::::::::::::::::::::::::::::::::::::::::::::::::::\n")    
+        arquivo.write(f"Último comando: {cmd}")
+        arquivo.write(f":::::::::::::::::::::::::::::::::::::::::::::::::::::\n")
     arquivo.close()
         
 # Ajusta o vetor de ensaios a partir do cenário fornecido
@@ -1097,7 +1113,7 @@ def ajustarCenario(parser):
         
     # Ajustando vetor de ensaios
     if (cenarioAtual == 0 or cenarioAtual == 1):
-        ensaioPrinc = numEDList if (tipoExecucao == 0) else [200,600,1000]  #[100,200,300] [200,400,600] [200,600,1000]
+        ensaioPrinc = numEDList if (tipoExecucao == 0) else [100,200,300]  #[100,200,300] [200,400,600] [200,600,1000]
         multiGw = True if (cenarioAtual == 1) else None
     elif (cenarioAtual == 2):
         ensaioPrinc = [6000, 8000, 10000, 12000] if (tipoExecucao == 0) else [8000, 10000]        
@@ -1168,13 +1184,13 @@ def ajustarComandoSpf(mob, gw, esq, ens, ensAlt):
     return cmd
 
 def main():    
-    #global dfPDR, dfCPSR, dfEneCon, dfEneEff, dfLatencia, dfPDR_ST   
+    #global dfPDR, dfCPSR, dfEneCon, dfEneEff, dfLatencia, dfPDR_ST       
      
 
     parser = argparse.ArgumentParser(description='Run simulations regarding different scenarios')
     ajustarCenario(parser)
 
-    if (tipoExecucao != 2):     # Os tipos 0 e 1 correspondem aos modos simulação e teste rápido
+    if ( novaSim ):
         inicio = time.time()
         executarSim()
         fim = time.time()
@@ -1186,7 +1202,7 @@ def main():
         arq.write(msgFinal)
         arq.close()
         backupData(outputPath) if backupOutputDir else None  # Realiza uma cópia do diretório de saída
-    else:                           # O tipo 2 corresponde ao modo replot (não há nova simulação)
+    else:                           
         print("Replotando gráficos...")
         reiniciarEstruturas() 
         for mob in dicMobil.keys(): 
@@ -1202,6 +1218,7 @@ def main():
                         protarGraficoST(mob, gw, ens) if serieTemp else None
                     carregarDadosPLRArq(mob, gw) if (gerarPLR) else None  ###
                     plotarGraficosPLR(mob, gw) if (gerarPLR) else None  ###
+                    gerarRelatorioFinal(mob, gw, "")
                 else:
                     for met in dicMetric.keys():
                         for esq in dicAdr.keys():
