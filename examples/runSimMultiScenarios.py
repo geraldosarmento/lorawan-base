@@ -24,8 +24,8 @@ import warnings
 # - 
 
 # -= Controle Geral =- 
-tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida
-novaSim          = True   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
+tipoExecucao     = 0      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida
+novaSim          = False   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
 mobility         = True   # Caso True, vai gerar 2 cenários (e vai dobrar o número de rodadas)
 backupOutputDir  = False  # Realiza um backup local dos resultados
 
@@ -87,7 +87,7 @@ serieTemp       = True          # Se exibir ou não gráficos de Série Temporal
 intervaloST     = 2             # Intervalo no eixo x nos gráficos de ST em h (horas)
 SFFinalED       = True         # Se plotar ou não gráficos com as atribuições finais de SF por ED
 energiaPorED    = True         # Se exibir o consumo médio por ED ou global na métrica EneCon
-efEnergEmKbits  = True         # Se exibir a medida de eficEnerg em Kbits/J ou bits/J
+efEnergEmKbits  = False         # Se exibir a medida de eficEnerg em Kbits/J ou bits/J
 multGWPar       = True          # MGP - modo MultGwPar para gerar gráficos pareados
 
 # -= ESTRUTURAS DE DADOS DINÂMICAS =-
