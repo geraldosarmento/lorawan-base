@@ -618,7 +618,7 @@ def plotarGraficosMultGWPar(mob, metrica):
 
 
 def plotarGraficosPLR(mob, gw):    
-    colors = ['lightslategray', 'lightcoral', 'lightgreen', 'orange', 'cyan']
+    colors = ['lightslategray', 'lightcoral', 'lightgreen', 'plum', 'cyan']
         
     eixo_x = dfPDR.iloc[:, 0]
     dfMedia_PDR = dfPDR.map(lambda lista: np.mean(lista))
@@ -655,7 +655,7 @@ def plotarGraficosPLR(mob, gw):
         # Legenda
         legend_font = FontProperties(family=nomeFonte, style='normal', size=tamFonteGraf-2)
         handles, labels = ax.get_legend_handles_labels()
-        ax.legend(reversed(handles), reversed(labels), loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=5, fontsize='large', handletextpad=0.5, handlelength=1.5, handleheight=1.8, frameon=False, prop=legend_font)
+        ax.legend(reversed(handles), reversed(labels), loc='upper center', bbox_to_anchor=(0.5, 1.18), ncol=5, fontsize='large', handletextpad=0.2, handlelength=1.5, handleheight=1.8, columnspacing=0.8, frameon=False, prop=legend_font)
 
         # Salva o gráfico em um arquivo
         plt.savefig(f"{outputPath}{lstCenarios[cenarioAtual]}-PLRbarra-{column}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
