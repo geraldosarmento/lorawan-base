@@ -36,6 +36,8 @@ double AdrMB::ImplementationCore(Ptr<EndDeviceStatus> status)  {
     double m_SNR = 0;
     std::vector<double> curSNR(historyRange);
     double fq, tq = 0;
+
+    //m_deviceMargin = 0;
     
     //std::cout << "ADR Central implementation core activated..." << std::endl;
     EndDeviceStatus::ReceivedPacketList packetList = status->GetReceivedPacketList ();

@@ -25,7 +25,6 @@
 #include "ns3/mobility-helper.h"
 #include "ns3/network-module.h"
 #include "ns3/network-server-helper.h"
-#include "ns3/netanim-module.h"
 #include "ns3/node-container.h"
 #include "ns3/okumura-hata-propagation-loss-model.h"
 #include "ns3/periodic-sender.h"

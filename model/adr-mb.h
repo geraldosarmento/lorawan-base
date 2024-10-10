@@ -31,6 +31,8 @@ public:
   static double GetThirdQuartile(std::vector<double> values);
   static void RemoveOutliers(std::vector<double>& values, double q1, double q3);
   static void RemovePercentiles(std::vector<double>& data);
+
+  
   
 private:  
   double ImplementationCore(Ptr<EndDeviceStatus> status) override;

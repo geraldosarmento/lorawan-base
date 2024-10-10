@@ -24,18 +24,18 @@ import warnings
 # - 
 
 # -= Controle Geral =- 
-tipoExecucao     = 0      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida
-novaSim          = False   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
-mobility         = True   # Caso True, vai gerar 2 cenários (e vai dobrar o número de rodadas)
-backupOutputDir  = False  # Realiza um backup local dos resultados
+tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida
+novaSim          = True   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
+mobility         = True   # Caso True, pode aplicar mobilidade parcial ou total aos EDs
+backupOutputDir  = True  # Realiza um backup local dos resultados
 
 
 # -= Parâmetros de Simulação =-
 numRep       = 10 if (tipoExecucao == 0) else 2
 sideLength   = 10000.0 #10000.0
-numPeriods   = 1.125 #1.125
+numPeriods   = 1   #1.125 (whether consider warming time)
 simTime      = numPeriods * 24*60*60     # Não usar tempo menor que 2h (7200s)
-simTime      = 9600 #43200 #14400 #7200
+#simTime      = 9600 #43200 #14400 #7200
 pktSize      = 30                      # 0 para usar valor default do módulo
 pktsPerDay   = 144
 pktsPerSecs  = pktsPerDay/86400
@@ -55,8 +55,10 @@ dicGw        = {1:"1 Gateway"}  # Por padrão, os cenários são monoGW
 # -= DICS 'n LISTS =-
 
 #Setar o esquema de referência (proposta) na 1a posição da lista (!)
-dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrLorawan":"ADR"} 
-#dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"} 
+dicAdr         = {"ns3::AdrMB":"MB-ADR"} 
+#dicAdr         = {"ns3::AdrMB":"MB-ADR", "ns3::AdrLorawan":"ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrKriging":"K-ADR"} 
+#dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrLorawan":"ADR"} 
+#dicAdr         = {"ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrPlus":"ADR+", "ns3::AdrLorawan":"ADR"} 
 #dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR" , "ns3::AdrKalman":"M-ADR", "ns3::AdrPlus":"ADR+", "ns3::AdrLorawan":"ADR"}   #Setar o esquema de referência (proposta) na 1a posição da lista
 # Esquemas: "ns3::AdrLorawan":"ADR" "ns3::AdrPlus":"ADR+" "ns3::AdrPF":"PF-ADR"  "ns3::AdrKalman":"M-ADR" "ns3::AdrMB":"MB-ADR"  "ns3::AdrKriging":"K-ADR"  "ns3::AdrEMA":"EMA-ADR" , "ns3::AdrGaussian":"G-ADR" "ns3::AdrFuzzyMB":"FADR-M", "ns3::AdrFuzzyRep":"FL-ADR"
 dicMobil       = {"1.0":"Mobile"} if (mobility) else {"0.0":"Static"}  # "0.5":"Semi-Mobile"
@@ -198,7 +200,7 @@ def executarSim():
                             agora = datetime.now()                           
                             atualizarDictTempo(esq, ensPrinc, tempoExec) if (not grafSuperf) else None 
                             print(f"\nTempo de execução desta rodada: {round(tempoExec/60,2)} min. ({agora.strftime('%Y-%m-%d %H:%M:%S')})")                             
-                            print(f"Tempo estimado de término da simulação: {round( (tempoAcum/rodCont * numTotRod)/60 , 2)} min \n") 
+                            print(f"Tempo estimado de término da simulação: {round( (tempoAcum/rodCont * (numTotRod-rodCont))/60 , 2)} min \n") 
                             rodCont += 1                               
                             atualizarDados(esq, ensPrinc, ensAlt)
                             atualizarDadosPLR(esq, ensPrinc) if (not grafSuperf) else None                            
@@ -1100,7 +1102,7 @@ def ajustarCenario(parser):
         
     # Ajustando vetor de ensaios
     if (cenarioAtual == 0 or cenarioAtual == 1):
-        ensaioPrinc = numEDList if (tipoExecucao == 0) else [100,200,300]  #[100,200,300] [200,400,600] [200,600,1000]
+        ensaioPrinc = numEDList if (tipoExecucao == 0) else [200,600,1000] #[100,200,300] [200,400,600] [200,600,1000]
         multiGw = True if (cenarioAtual == 1) else None
     elif (cenarioAtual == 2):
         ensaioPrinc = [6000, 8000, 10000, 12000] if (tipoExecucao == 0) else [8000, 10000]        

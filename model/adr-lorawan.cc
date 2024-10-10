@@ -238,15 +238,15 @@ AdrLorawan::AdrImplementation(uint8_t* newDataRate,
     }
     while (steps > 0 && transmissionPower > min_transmissionPower)
     {
-        transmissionPower -= 3;
+        transmissionPower -= 2;
         steps--;
-        NS_LOG_DEBUG("Decreased Ptx by 3");
+        NS_LOG_DEBUG("Decreased Ptx by 2");
     }
     while (steps < 0 && transmissionPower < max_transmissionPower)
     {
-        transmissionPower += 3;
+        transmissionPower += 2;
         steps++;
-        NS_LOG_DEBUG("Increased Ptx by 3");
+        NS_LOG_DEBUG("Increased Ptx by 2");
     }
     
     if (transmissionPower > max_transmissionPower)

@@ -12,5 +12,6 @@ mkdir scratch/output
 #mkdir scratch/output/data
 #mkdir scratch/output/plot
 ./ns3 clean
-./ns3 configure --enable-examples --enable-tests
+#./ns3 configure --enable-examples --enable-tests
+./ns3 configure -d optimized --enable-examples --enable-tests
 ./ns3 build
