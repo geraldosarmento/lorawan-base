@@ -45,6 +45,7 @@ set(source_files
     model/adr-fuzzy-rep.cc
     model/adr-fuzzy-mb.cc
     model/adr-mb.cc
+    model/adr-emb.cc
     model/adr-pid.cc
     model/adr-pf.cc
     model/adr-pfmb.cc
@@ -107,6 +108,7 @@ set(header_files
     model/adr-fuzzy-rep.h
     model/adr-fuzzy-mb.h
     model/adr-mb.h
+    model/adr-emb.h
     model/adr-pid.h
     model/adr-pf.h
     model/adr-pfmb.h

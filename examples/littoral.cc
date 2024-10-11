@@ -75,15 +75,23 @@ bool const shadowingPropModel = true;
 double pathLossExp = 3.76;
 bool gridBuilAlloc = false;
 //bool poissonModel = false;
-bool const discPosLayout = true;  // true: circular region, false: square region  
+bool circularArea = true;  // true: circular area, false: square area  
 bool verbose = false;
 bool const saveToFile = true;
 
-//-- Mobility Parameters --//
+//-- Mobility Parameters --// 
+enum mobilityModel {
+    RandomWalk      = 0,
+    RandomWaypoint  = 1,
+    GaussMarkov     = 2
+};
+
 double mobileNodeProbability = 0.0;
 double minSpeed = 0.5;
 double maxSpeed = 1.5;
 double maxRandomLoss = 10;
+int mobModel = RandomWalk;
+
 
 //-- Energy Parameters --//
 bool energyModel = true;
@@ -195,14 +203,16 @@ main(int argc, char* argv[])
     cmd.AddValue("building", "Whether to use GridBuildingAllocation model or not", gridBuilAlloc);
     cmd.AddValue("nPeriods", "Number of periods to simulate", nPeriods);
     cmd.AddValue("sideLength", "The side length of the area to simulate", sideLength);
+    cmd.AddValue("circArea", "Whether the simulation area is circular ou square", circularArea);
     cmd.AddValue("mobEDProb", "Probability of mobile ED", mobileNodeProbability);
     cmd.AddValue("baseSeed", "Which seed value to use on RngSeedManager", baseSeedSetRun);
     cmd.AddValue("maxRandomLoss",
                  "Maximum amount in dB of the random loss component",
                  maxRandomLoss);
     cmd.AddValue("initializeSF", "Whether to initialize the SFs", initializeSF);
-    cmd.AddValue("MinSpeed", "Minimum speed for mobile devices", minSpeed);
-    cmd.AddValue("MaxSpeed", "Maximum speed for mobile devices", maxSpeed);
+    cmd.AddValue("minSpeed", "Minimum speed for mobile devices", minSpeed);
+    cmd.AddValue("maxSpeed", "Maximum speed for mobile devices", maxSpeed);
+    cmd.AddValue("mobModel", "Set the mobility model class id", mobModel);
     cmd.AddValue("pathLossExp", "Set the path loss exponent in LogDistancePropagationLossModel", pathLossExp);
     cmd.AddValue("verbose", "Whether verbose mode is active", verbose);
   
@@ -319,7 +329,7 @@ main(int argc, char* argv[])
     MobilityHelper mobilityEd;
     MobilityHelper mobilityGw;
 
-    if (discPosLayout) {
+    if (circularArea) {
         mobilityEd.SetPositionAllocator ("ns3::UniformDiscPositionAllocator", "rho", DoubleValue (sideLength/2),
                                  "X", DoubleValue (0.0), "Y", DoubleValue (0.0));
     }
@@ -436,9 +446,11 @@ main(int argc, char* argv[])
         mobility->SetPosition (position);
     }
     // Install mobility model on mobile nodes
-    mobilityEd.SetMobilityModel(
+
+    if (mobModel == RandomWalk) {
+        mobilityEd.SetMobilityModel(
         "ns3::RandomWalk2dMobilityModel",
-        "Bounds",
+        "Bounds",        
         RectangleValue(Rectangle(-sideLength/2, sideLength/2, -sideLength/2, sideLength/2)),
         "Distance",
         DoubleValue(1000),
@@ -447,6 +459,42 @@ main(int argc, char* argv[])
                                                                        DoubleValue(minSpeed),
                                                                        "Max",
                                                                        DoubleValue(maxSpeed))));
+    }
+    else if (mobModel == RandomWaypoint) {
+        mobilityEd.SetMobilityModel(
+        "ns3::RandomWaypointMobilityModel",
+        "Pause",
+        PointerValue(CreateObjectWithAttributes<UniformRandomVariable>("Min",
+                                                                       DoubleValue(0),
+                                                                       "Max",
+                                                                       DoubleValue(2.0))),    
+        "Speed",
+        PointerValue(CreateObjectWithAttributes<UniformRandomVariable>("Min",
+                                                                       DoubleValue(minSpeed),
+                                                                       "Max",
+                                                                       DoubleValue(maxSpeed))));
+
+    }
+    else if (mobModel == GaussMarkov) {
+        mobilityEd.SetMobilityModel(
+        "ns3::GaussMarkovMobilityModel",
+        "Bounds",        
+        BoxValue(Box(-sideLength/2, sideLength/2, -sideLength/2, sideLength/2, 0, edHeight)),
+        "TimeStep", TimeValue(Seconds(1.0)),
+        "Alpha", DoubleValue(1.0),
+        "MeanDirection",
+        PointerValue(CreateObjectWithAttributes<UniformRandomVariable>("Min",
+                                                                       DoubleValue(0),
+                                                                       "Max",
+                                                                       DoubleValue(1000))),
+        "MeanVelocity",
+        PointerValue(CreateObjectWithAttributes<UniformRandomVariable>("Min",
+                                                                       DoubleValue(minSpeed),
+                                                                       "Max",
+                                                                       DoubleValue(maxSpeed))));
+
+    }
+   
     for (int i = fixedPositionNodes; i < (int)endDevices.GetN(); ++i)
     {
         mobilityEd.Install(endDevices.Get(i));
@@ -457,6 +505,7 @@ main(int argc, char* argv[])
         mobility->SetPosition (position);        
         //std::cout << "Mobilidade no nó : " << endDevices.Get(i)->GetId() << std::endl;
     }
+    std::cout << "Modelo de mobilidade aplicado : " << mobModel << std::endl;
       
     /*
     //Printing ED pos / speed

@@ -33,7 +33,8 @@ backupOutputDir  = True  # Realiza um backup local dos resultados
 # -= Parâmetros de Simulação =-
 numRep       = 10 if (tipoExecucao == 0) else 2
 sideLength   = 10000.0 #10000.0
-numPeriods   = 1   #1.125 (whether consider warming time)
+areaFormat   = 1   # 0: circular | 1 - square
+numPeriods   = 1   #  (1.125: whether consider warming time)
 simTime      = numPeriods * 24*60*60     # Não usar tempo menor que 2h (7200s)
 #simTime      = 9600 #43200 #14400 #7200
 pktSize      = 30                      # 0 para usar valor default do módulo
@@ -42,9 +43,11 @@ pktsPerSecs  = pktsPerDay/86400
 appPeriod    = 1/pktsPerSecs 
 numEDList    = [200, 400, 600, 800, 1000]
 numEDMed     = numEDList[-1]/2          # Armazena o número médio do ED máximo
+minSpeed     = 6.5  # def: 0.5
+maxSpeed     = 9.0  # def: 1.5
 pathLossExp  = 3.76
 areaIC       = 0.975  # área gaussina para um intervalo de confiança bilateral de 95% 
-okumura      = "false"
+okumura      = False
 environment  = 0      # 0: UrbanEnvironment, 1: SubUrbanEnvironment, 2: OpenAreasEnvironment. Só tem efeito quando 'okumura = "true" '
 modoConf     = False   # Caso True, ativa-se o modo confirmado e utiliza-se a métrica CPSR
 # Não alterar (!)
@@ -55,8 +58,8 @@ dicGw        = {1:"1 Gateway"}  # Por padrão, os cenários são monoGW
 # -= DICS 'n LISTS =-
 
 #Setar o esquema de referência (proposta) na 1a posição da lista (!)
-dicAdr         = {"ns3::AdrMB":"MB-ADR"} 
-#dicAdr         = {"ns3::AdrMB":"MB-ADR", "ns3::AdrLorawan":"ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrKriging":"K-ADR"} 
+dicAdr         = {"ns3::AdrEMB":"EMB-ADR", "ns3::AdrMB":"MB-ADR"} 
+#dicAdr         = {"ns3::AdrMB":"MB-ADR", "ns3::AdrLorawan":"ADR", "ns3::AdrKalman":"M-ADR"} 
 #dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrLorawan":"ADR"} 
 #dicAdr         = {"ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrPlus":"ADR+", "ns3::AdrLorawan":"ADR"} 
 #dicAdr         = {"ns3::AdrPF":"PF-ADR", "ns3::AdrMB":"MB-ADR" , "ns3::AdrKalman":"M-ADR", "ns3::AdrPlus":"ADR+", "ns3::AdrLorawan":"ADR"}   #Setar o esquema de referência (proposta) na 1a posição da lista
@@ -200,13 +203,13 @@ def executarSim():
                             agora = datetime.now()                           
                             atualizarDictTempo(esq, ensPrinc, tempoExec) if (not grafSuperf) else None 
                             print(f"\nTempo de execução desta rodada: {round(tempoExec/60,2)} min. ({agora.strftime('%Y-%m-%d %H:%M:%S')})")                             
-                            print(f"Tempo estimado de término da simulação: {round( (tempoAcum/rodCont * (numTotRod-rodCont))/60 , 2)} min \n") 
+                            #print(f"Tempo estimado de término da simulação: {round( (tempoAcum/rodCont * (numTotRod-rodCont))/60 , 2)} min \n") 
                             rodCont += 1                               
                             atualizarDados(esq, ensPrinc, ensAlt)
                             atualizarDadosPLR(esq, ensPrinc) if (not grafSuperf) else None                            
                             atualizarDadosST(mob, gw, esq, ensPrinc, rep) if (serieTemp and (not grafSuperf)) else None
                             obterSFFinalEsquema(mob, gw, esq, ensPrinc)
-                        #print(obterRelatorio(cmd))
+                        ###print(obterRelatorio(cmd))
                     plotarSFFinalporED(mob, gw, esq) if (SFFinalED and (not mobility) and (not grafSuperf)) else None                                
                     reiniciarEstruturasST()
                 print(obterRelatorio(cmd))
@@ -1102,7 +1105,7 @@ def ajustarCenario(parser):
         
     # Ajustando vetor de ensaios
     if (cenarioAtual == 0 or cenarioAtual == 1):
-        ensaioPrinc = numEDList if (tipoExecucao == 0) else [200,600,1000] #[100,200,300] [200,400,600] [200,600,1000]
+        ensaioPrinc = numEDList if (tipoExecucao == 0) else [400,600,800] #[100,200,300] [200,400,600] [200,600,1000]
         multiGw = True if (cenarioAtual == 1) else None
     elif (cenarioAtual == 2):
         ensaioPrinc = [6000, 8000, 10000, 12000] if (tipoExecucao == 0) else [8000, 10000]        
@@ -1142,7 +1145,12 @@ def ajustarComando(mob, gw, esq, ens):
     # O AdrKalman (M-ADR) acrescenta bytes extras no cabeçalho para incluir as coord X e Y do ED.
     size = pktSize+10 if (esq == "ns3::AdrKalman") else pktSize
 
-    cmd = f"./ns3 run \"littoral  --mobEDProb={mob} --adrType={esq} --nGw={gw} --simTime={simTime} --pktSize={size} --okumura={okumura} --environment={environment} --confMode={modoConf} "
+    cmd = (
+        f"./ns3 run \"littoral  --mobEDProb={mob} --adrType={esq} --nGw={gw} --simTime={simTime} --pktSize={size} "
+        f"--circArea={'true' if not areaFormat else 'false'} --minSpeed={minSpeed} --maxSpeed={maxSpeed} "
+        f"--okumura={'true' if okumura else 'false'} --environment={environment} --confMode={'true' if modoConf else 'false'} "
+    )
+    
     if (cenarioAtual == 0 or cenarioAtual == 1):
         cmd += f"--nED={ens}   --sideLength={sideLength}   --appPeriodSecs={appPeriod} --pathLossExp={pathLossExp}\" "
     elif (cenarioAtual == 2):
@@ -1161,7 +1169,12 @@ def ajustarComandoSpf(mob, gw, esq, ens, ensAlt):
     # O AdrKalman (M-ADR) acrescenta bytes extras no cabeçalho para incluir as coord X e Y do ED.
     size = pktSize+10 if (esq == "ns3::AdrKalman") else pktSize
 
-    cmd = f"./ns3 run \"littoral  --mobEDProb={mob} --adrType={esq} --nGw={gw} --simTime={simTime} --pktSize={size} --okumura={okumura} --environment={environment} --confMode={modoConf} "
+    cmd = (
+        f"./ns3 run \"littoral  --mobEDProb={mob} --adrType={esq} --nGw={gw} --simTime={simTime} --pktSize={size} "
+        f"--circArea={'true' if circArea else 'false'} --minSpeed={minSpeed} --maxSpeed={maxSpeed} "
+        f"--okumura={'true' if okumura else 'false'} --environment={environment} --confMode={'true' if modoConf else 'false'} "
+    )
+    
     if (modeloSpf == 0):        
         cmd += f"--nED={ens} --sideLength={sideLength} --appPeriodSecs={86400/ensAlt} --pathLossExp={pathLossExp}\" "
     elif (modeloSpf == 1):
