@@ -56,8 +56,7 @@ int nGateways = 1;
 int nPeriods = 1;
 double simulationTime = (24*60*60 * nPeriods);
 double pktsPerDay = 144;    // e.g.: 144 pkts/day is equivalent to 1 pkt/600s
-double pktsPerSecs = pktsPerDay/86400;
-double appPeriodSecs = (1/pktsPerSecs); 
+double appPeriodSecs = 600; 
 int packetSize = 30;  
 double sideLength = 10000.0;   // If the region is circular, sideLength will represent the diameter of the area, so sideLength = 2*radius
 double edHeight = 1.5;
@@ -505,7 +504,7 @@ main(int argc, char* argv[])
         mobility->SetPosition (position);        
         //std::cout << "Mobilidade no nó : " << endDevices.Get(i)->GetId() << std::endl;
     }
-    std::cout << "Modelo de mobilidade aplicado : " << mobModel << std::endl;
+    //std::cout << "Modelo de mobilidade aplicado : " << mobModel << std::endl;
       
     /*
     //Printing ED pos / speed
@@ -616,6 +615,8 @@ main(int argc, char* argv[])
    *  Install applications on the end devices  *
    *********************************************/
     
+    if (pktsPerDay>0) 
+        appPeriodSecs = (86400/pktsPerDay);
     Time appStopTime = Seconds (simulationTime);
     PeriodicSenderHelper appHelper = PeriodicSenderHelper ();
     appHelper.SetPeriod (Seconds (appPeriodSecs));
