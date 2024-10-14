@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 import shutil
 import time
+from matplotlib import ticker
 from matplotlib.font_manager import FontProperties
 from scipy.stats import norm
 import pandas as pd
@@ -32,7 +33,7 @@ pktSize         = 30                      # 0 para usar valor default do módulo
 pktsPerDay      = 144
 appPeriod       = 86400/pktsPerDay
 mobility        = True
-multiGw         = True
+multiGw         = False
 modMob          = 0    # 0: RandomWalk, 1: RandomWaypoint, 2: GaussMarkov
 minSpeed        = 6.5  # def: 0.5
 maxSpeed        = 9.0  # def: 1.5
@@ -53,7 +54,7 @@ maxSpeedLst     = [3.0, 6.0, 9.0]
 mobDic          = {"1.0":"Mobile"} if (mobility) else {"0.0":"Static"}  # "0.5":"Semi-Mobile"
 cenarioLgdDic   = {0:'numED', 1:'sideLength', 2:'pktsPerDay', 3:'modMob', 4:'speedClass'}
 metricasDic     = {"PDR": "PDR", "EneCon":"Energy consumption (J)", "EneEff":"Energy efficiency (bits/J)", "Latencia":"Uplink latency (s)", "CPSR": "CPSR"} # Inserir "ColRate": "Collision Rate"
-PLRLst          = ['PLR_I', 'PLR_R', 'PLR_T','PLR_S']
+PLRDic          = {'PLR_I': 'Interfered', 'PLR_R': 'No Reception Paths', 'PLR_T': 'Concurrent Downlink Transmission','PLR_S': 'Under Sensitivity', 'UNSET': 'Remaining PDR'}
 
 dimDic          = { 'dim1' : [0], 'dim2' : [0] }      # Dicionário para armazenar os conjuntos de valores utilizados na simulação em 2 dimensões
 dimIdDic        = { 'dim1' : "", 'dim2' : ""  }
@@ -78,11 +79,13 @@ trtmntDic = {
 
 amostras        = {metric: [] for metric in metricasDic.keys()}
 dfMetricas      = {metric: pd.DataFrame() for metric in metricasDic.keys()} 
-dfPLR           = {metric: pd.DataFrame() for metric in PLRLst} 
+dfPLR           = {metric: pd.DataFrame() for metric in PLRDic.keys()} 
+amostrasPLR     = {metric: [] for metric in PLRDic.keys()}
 
 # -= Valores de referência. Não alterar (!) =-
 adrTypeDef      = list(trtmntDic['adrType'].keys())[0]  # Esquema ADR default: o 1º do dic.
 numED           = int(numEDLst[-1]/2)
+tempoLst        = list(range(1, int(simTime/3600) + 1))  # lista contendo as horas de simulação para ST
 gwDic           = {1:"1 Gateway"} if (not multiGw) else  {1:"1 Gateway", 2:"2 Gateways"} 
 
 # Controle dos Gráficos
@@ -155,18 +158,19 @@ def executarSim():
                         atualizarDados(dim1, dim2)
             salvarDadosMetricasArq(mob, gw)
             plotarGraficos(mob, gw)
-            print(f"dfMetricas = \n{dfMetricas}")
+            plotarGraficosPLR(mob, gw)
+            #print(f"dfMetricas = \n{dfMetricas}")
             reiniciarEstruturas()
 
-        if (multGWPar):
-            plotarGraficosMGP(mob)
+        plotarGraficosMGP(mob) if (multiGw and multGWPar) else None
+            
             
 
 
 
 
 def reiniciarEstruturas():
-    global dfMetricas
+    global dfMetricas, dfPLR
 
     modelo = pd.DataFrame()
     modelo[dimIdDic['dim1']] = dimDic['dim1']  #1a coluna: ensaio dim1 - eixo x dos gráficos
@@ -175,15 +179,18 @@ def reiniciarEstruturas():
 
     for ml in metricasDic.keys():
         dfMetricas[ml] = modelo.copy()
-   
- 
+
+    for pl in PLRDic.keys():
+        dfPLR[pl] = modelo.copy()    
+
+    
 
 
 def atualizarDados(dim1, dim2):
     global dfMetricas, amostras
 
     arquivoGP = glPcktCnt + adrType + '.csv'
-    arqGP = pd.read_csv(arquivoGP, header=None, sep=' ')   
+    arqGP = pd.read_csv(arquivoGP, header=None, sep=' ') 
 
     # Adiciona novos dados às amostras
     amostras[list(metricasDic.keys())[0]].append(arqGP.iloc[0, 2])  # PDR
@@ -203,28 +210,45 @@ def atualizarDados(dim1, dim2):
         amostras['CPSR'].append(arqGPC.iloc[0, 2])  # CPSR
 
     # Verifica se temos amostras suficientes para atualizar
-    if len( amostras[list(metricasDic.keys())[0]] ) == numRep:        
+    if len( amostras[list(metricasDic.keys())[0]] ) == numRep:
         i = dimDic['dim1'].index(dim1)  # Índice para a linha
 
         for ml in metricasDic.keys():
             dfMetricas[ml].at[i, dim2] = amostras[ml].copy()
+            amostras[ml].clear()
             
-        for ml in metricasDic.keys():
-            amostras[ml].clear() 
+        #for ml in metricasDic.keys():
+        #    amostras[ml].clear() 
+    
+    # Leitura do DF para PLR
+    arquivoPhy = phyPerf + adrType + '.csv'
+    arqPhy = pd.read_csv(arquivoPhy, header=None, sep=' ') 
 
-        #dfMetricas['PDR'].at[i, dim2] = cont
-        #cont += 1
-        '''# Atualiza os DataFrames com cópias das listas
-        for ml in metricasLst:
-            dfMetricas[ml].at[i, dim2] = amostras[ml].copy()  # Usando .copy() para garantir uma nova lista
+    env   = arqPhy[arqPhy[0] > 0][2]
+    pdr   = arqPhy[arqPhy[0] > 0][3]/env
+    plr_I = arqPhy[arqPhy[0] > 0][4]/env
+    plr_R = arqPhy[arqPhy[0] > 0][5]/env
+    plr_S = arqPhy[arqPhy[0] > 0][6]/env
+    plr_T = arqPhy[arqPhy[0] > 0][7]/env
+    unset = 1 - (pdr + plr_I + plr_R + plr_S + plr_T)  # Valor remanescente a ser acrescentado ao PDR
+        
+    amostrasPLR['PLR_I'].append(plr_I.mean())
+    amostrasPLR['PLR_R'].append(plr_R.mean())    
+    amostrasPLR['PLR_S'].append(plr_S.mean())
+    amostrasPLR['PLR_T'].append(plr_T.mean())
+    amostrasPLR['UNSET'].append(unset.mean())
 
-        # Limpa as amostras para a próxima rodada
-        for ml in metricasLst:
-            amostras[ml].clear()  # Limpa a lista para a próxima rodada'''
+    if (len(amostrasPLR['PLR_I']) == numRep):   
+        i = dimDic['dim1'].index(dim1)  # Índice para a linha
 
-        #print(f"dfMetricas = \n{dfMetricas}")
-          
+        for pl in PLRDic.keys():
+            dfPLR[pl].at[i, dim2] = amostrasPLR[pl].copy()
+            amostrasPLR[pl].clear()
+    
+   #print(f"dfPLR = \n{dfPLR}")
 
+       
+       
 def ajustarLstCenarios(parser):
     global tipoCenario, dimDic, dimIdDic
     
@@ -358,8 +382,6 @@ def plotarGraficos(mob, gw):
         plt.savefig(f"{outputPath}Cen{tipoCenario}-{dimIdDic['dim1']}-{metK}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
         plt.close()
 
-# #lbl = f"{lbl}-{gwK}GW"          
-
 def plotarGraficosMGP(mob):
     global marcadores
     
@@ -420,7 +442,60 @@ def plotarGraficosMGP(mob):
         plt.tight_layout()
         plt.savefig(f"{outputPath}Cen{tipoCenario}-{dimIdDic['dim1']}-{metK}-MbltProb{mob}-MultGwPar.png", bbox_inches='tight')
         plt.close()    
+
+def plotarGraficosPLR(mob, gw):    
+    colors = ['lightslategray', 'lightcoral', 'lightgreen', 'plum', 'cyan']
+        
+    if (not novaSim):
+        carregarDadosPLRArq(mob, gw)
     
+    #eixo_x = dfMetricas[metK].iloc[:, 0]   
+    #dados = dfMetricas[metK].iloc[:, 1:]   # Removendo o primeiro elemento de cada Series (que corresponde ao rótulo da coluna)
+    
+    eixo_x = dfMetricas['PDR'].iloc[:, 0]
+    dfMedia_PDR = dfMetricas['PDR'].map(lambda lista: np.mean(lista))
+    dfMedia_PLR_I = dfPLR['PLR_I'].map(lambda lista: np.mean(lista))
+    dfMedia_PLR_R = dfPLR['PLR_R'].map(lambda lista: np.mean(lista))
+    dfMedia_PLR_T = dfPLR['PLR_T'].map(lambda lista: np.mean(lista))
+    dfMedia_PLR_S = dfPLR['PLR_S'].map(lambda lista: np.mean(lista))   
+    dfMedia_Unset = dfPLR['UNSET'].map(lambda lista: np.mean(lista))  
+    dfMedia_PDR = dfMedia_PDR + dfMedia_Unset
+    
+    for column in dfMedia_PDR.columns[1:]:
+        # Cria uma nova figura para cada esquema
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.grid(axis='y', linestyle='--', alpha=0.7, zorder=0) 
+
+        width = 0.5
+        # Plota os dados de SetA
+        ax.bar(range(len(dfMedia_PDR)), dfMedia_PDR[column], color=colors[0], edgecolor='black', hatch=padroesHachura[0], label='PDR', width=width, zorder=3)
+        ax.bar(range(len(dfMedia_PLR_I)), dfMedia_PLR_I[column], bottom=dfMedia_PDR[column], color=colors[1], edgecolor='black', hatch=padroesHachura[1], label='PLR-I', width=width, zorder=3)
+        ax.bar(range(len(dfMedia_PLR_R)), dfMedia_PLR_R[column], bottom=dfMedia_PDR[column] + dfMedia_PLR_I[column], color=colors[2], edgecolor='black', hatch=padroesHachura[2], label='PLR-R', width=width, zorder=3)
+        ax.bar(range(len(dfMedia_PLR_S)), dfMedia_PLR_S[column], bottom=dfMedia_PDR[column] + dfMedia_PLR_I[column] + dfMedia_PLR_R[column], color=colors[3], edgecolor='black', hatch=padroesHachura[3], label='PLR-S', width=width, zorder=3)
+        ax.bar(range(len(dfMedia_PLR_T)), dfMedia_PLR_T[column], bottom=dfMedia_PDR[column] + dfMedia_PLR_I[column] + dfMedia_PLR_R[column] + dfMedia_PLR_S[column], color=colors[4], edgecolor='black', hatch=padroesHachura[4], label='PLR-T', width=width, zorder=3)
+        
+        # Rotula os eixos        
+        ax.set_xlabel(trtmntLblDic[dimIdDic['dim1']], fontsize=tamFonteGraf, fontname=nomeFonte) #fontweight='bold'
+        ax.set_ylabel('Ratio', fontname=nomeFonte, fontsize=tamFonteGraf)
+        ax.set_xticks(range(len(dfMedia_PDR)))
+        ax.set_ylim(0, 1.0)
+        ax.set_yticks(ax.get_yticks())
+        ax.set_xticklabels(eixo_x, fontsize=tamFonteGraf, fontname=nomeFonte)
+        ax.set_yticklabels(ax.get_yticks(), fontsize=tamFonteGraf, fontname=nomeFonte)
+        ax.set_yticks(np.arange(0, 1.1, 0.1))  # Define os ticks do eixo Y de 10 em 10        
+        ax.yaxis.set_major_formatter(ticker.StrMethodFormatter("{x:.1f}"))         
+         
+        # Legenda
+        legend_font = FontProperties(family=nomeFonte, style='normal', size=tamFonteGraf-2)
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(reversed(handles), reversed(labels), loc='upper center', bbox_to_anchor=(0.5, 1.18), ncol=5, fontsize='large', handletextpad=0.2, handlelength=1.5, handleheight=1.8, columnspacing=0.8, frameon=False, prop=legend_font)
+
+        # Salva o gráfico em um arquivo
+        plt.savefig(f"{outputPath}{dimIdDic['dim1']}-PLRbarra-{column}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
+        #plt.savefig(f"{outputPath}Cen{tipoCenario}-{dimIdDic['dim1']}-{metK}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
+
+        # Fecha a figura para liberar memória
+        plt.close()  
     
 ##### ARQUIVOS ######
 # Função para salvar um DF em um arquivo JSON
@@ -428,10 +503,19 @@ def salvarDadosMetricasArq(mob, gw):
     for ml in metricasDic.keys():
         dfMetricas[ml].to_json(f"{outputPath}Cen{tipoCenario}-{dimIdDic['dim1']}-{ml}-MbltProb{mob}-{gw}Gw.json", orient='records')
 
+def salvarDadosPLRArq(mob, gw):
+    for pl in PLRDic.keys():
+        dfPLR[pl].to_json(f"{outputPath}Cen{tipoCenario}-{dimIdDic['dim1']}-{pl}-MbltProb{mob}-{gw}Gw.json", orient='records')
+
 def carregarDadosMetricasArq(mob, gw):
     global dfMetricas
     for ml in metricasDic.keys():
         dfMetricas[ml] = pd.read_json(f"{outputPath}Cen{tipoCenario}-{dimIdDic['dim1']}-{ml}-MbltProb{mob}-{gw}Gw.json", orient='records')
+
+def carregarDadosPLRArq(mob, gw):
+    global dfPLR
+    for pl in PLRDic.keys():
+        dfPLR[pl] = pd.read_json(f"{outputPath}Cen{tipoCenario}-{dimIdDic['dim1']}-{pl}-MbltProb{mob}-{gw}Gw.json", orient='records')
 
 def apagarArqs(path, extensao=None):
     try:
