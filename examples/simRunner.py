@@ -32,6 +32,7 @@ pktSize         = 30                      # 0 para usar valor default do módulo
 pktsPerDay      = 144
 appPeriod       = 86400/pktsPerDay
 mobility        = True
+multiGw         = True
 modMob          = 0    # 0: RandomWalk, 1: RandomWaypoint, 2: GaussMarkov
 minSpeed        = 6.5  # def: 0.5
 maxSpeed        = 9.0  # def: 1.5
@@ -42,13 +43,14 @@ okumuraEnvrmnt  = 0      # 0: UrbanEnvironment, 1: SubUrbanEnvironment, 2: OpenA
 modoConfirm     = False   # Caso True, ativa-se o modo confirmado e utiliza-se a métrica CPSR
 
 
+
 # -= Listas, Dicionários e Estruturas de Dados =-
 numEDLst        = [200, 400, 600, 800, 1000]
 sideLengthLst   = [4000, 6000, 8000, 10000]
 pktsPerDayLst   = [72, 96, 144, 288]  # Esses valores em 'App period' equivalem a 300s,600s,900s e 1200s, respect.
 minSpeedLst     = [0.5, 3.5, 6.5]
 maxSpeedLst     = [3.0, 6.0, 9.0]
-MobDic          = {"1.0":"Mobile"} if (mobility) else {"0.0":"Static"}  # "0.5":"Semi-Mobile"
+mobDic          = {"1.0":"Mobile"} if (mobility) else {"0.0":"Static"}  # "0.5":"Semi-Mobile"
 cenarioLgdDic   = {0:'numED', 1:'sideLength', 2:'pktsPerDay', 3:'modMob', 4:'speedClass'}
 metricasDic     = {"PDR": "PDR", "EneCon":"Energy consumption (J)", "EneEff":"Energy efficiency (bits/J)", "Latencia":"Uplink latency (s)", "CPSR": "CPSR"} # Inserir "ColRate": "Collision Rate"
 PLRLst          = ['PLR_I', 'PLR_R', 'PLR_T','PLR_S']
@@ -81,8 +83,7 @@ dfPLR           = {metric: pd.DataFrame() for metric in PLRLst}
 # -= Valores de referência. Não alterar (!) =-
 adrTypeDef      = list(trtmntDic['adrType'].keys())[0]  # Esquema ADR default: o 1º do dic.
 numED           = int(numEDLst[-1]/2)
-multiGw         = False
-GwDic           = {1:"1 Gateway"}  # Por padrão, os cenários são monoGW
+gwDic           = {1:"1 Gateway"} if (not multiGw) else  {1:"1 Gateway", 2:"2 Gateways"} 
 
 # Controle dos Gráficos
 tamFonteGraf    = 20
@@ -102,7 +103,7 @@ intervaloST     = 2             # Intervalo no eixo x nos gráficos de ST em h (
 SFFinalED       = True         # Se plotar ou não gráficos com as atribuições finais de SF por ED
 energiaPorED    = True         # Se exibir o consumo médio por ED ou global na métrica EneCon
 efEnergEmKbits  = False         # Se exibir a medida de eficEnerg em Kbits/J ou bits/J
-multGWPar       = True          # MGP - modo MultGwPar para gerar gráficos pareados
+multGWPar       = False          # MGP - modo MultGwPar para gerar gráficos pareados
 
 # -= Arquivos =-
 outputFile     = ""
@@ -130,12 +131,12 @@ def executarSim():
     print(f"dimIdDic = \n{dimIdDic}")       
     
     print(f"Cenário selecionado: {cenarioLgdDic[tipoCenario]}.")   
-    for mob in MobDic.keys(): 
-        for gw in GwDic.keys():
+    for mob in mobDic.keys(): 
+        for gw in gwDic.keys():
             for dim1 in dimDic['dim1']:
                 for dim2 in dimDic['dim2']:                    
                     for rep in range(numRep):
-                        numTotRod = len(MobDic)*len(GwDic)*len(dimDic['dim1'])*len(dimDic['dim2'])*numRep
+                        numTotRod = len(mobDic)*len(gwDic)*len(dimDic['dim1'])*len(dimDic['dim2'])*numRep
                         print("==================================================================================================================")
                         print(f"   Ensaio atual: {dimIdDic['dim1']}={dim1} | {dimIdDic['dim2']}={dim2} - NumGw: {gw} - Mobilidade:{'Sim' if (float(mob)>0) else 'Não'} - Rep: {rep+1} - Rodada: {rodCont} de {numTotRod}")
                         print("==================================================================================================================")
@@ -154,9 +155,9 @@ def executarSim():
                         atualizarDados(dim1, dim2)
             salvarDadosMetricasArq(mob, gw)
             plotarGraficos(mob, gw)
-            #plotar gráficos (carregando dados dos arquivos)
-            #reiniciar estruturas
             print(f"dfMetricas = \n{dfMetricas}")
+            reiniciarEstruturas()
+            
 
 
 
@@ -414,8 +415,8 @@ def main():
     else:                           
         print("Replotando gráficos...")
         reiniciarEstruturas() 
-        for mob in MobDic.keys(): 
-            for gw in GwDic.keys():
+        for mob in mobDic.keys(): 
+            for gw in gwDic.keys():
                 plotarGraficos(mob, gw)
             
 
