@@ -38,38 +38,47 @@ maxSpeed        = 9.0  # def: 1.5
 pathLossExp     = 3.76
 areaIC          = 0.975  # área gaussina para um intervalo de confiança bilateral de 95% 
 okumura         = False
-environment     = 0      # 0: UrbanEnvironment, 1: SubUrbanEnvironment, 2: OpenAreasEnvironment. Só tem efeito quando 'okumura = "true" '
-modoConf        = False   # Caso True, ativa-se o modo confirmado e utiliza-se a métrica CPSR
+okumuraEnvrmnt  = 0      # 0: UrbanEnvironment, 1: SubUrbanEnvironment, 2: OpenAreasEnvironment. Só tem efeito quando 'okumura = "true" '
+modoConfirm     = False   # Caso True, ativa-se o modo confirmado e utiliza-se a métrica CPSR
 
 
 # -= Listas, Dicionários e Estruturas de Dados =-
-dimDic          = { 'dim1' : [0], 'dim2' : [0] }      # Dicionário para armazenar os valores de 3 conjuntos de valores utilizados na simulação
-dimIdDic        = { 'dim1' : "", 'dim2' : ""  }
 numEDLst        = [200, 400, 600, 800, 1000]
+pktsPerDayLst   = [72, 96, 144, 288]  # Esses valores em 'App period' equivalem a 300s,600s,900s e 1200s, respect.
 MobDic          = {"1.0":"Mobile"} if (mobility) else {"0.0":"Static"}  # "0.5":"Semi-Mobile"
-AdrDic          = {"ns3::AdrMB":"MB-ADR"} 
-#AdrDic          = {"ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"} 
-# Esquemas: "ns3::AdrLorawan":"ADR" "ns3::AdrPlus":"ADR+" "ns3::AdrPF":"PF-ADR"  "ns3::AdrKalman":"M-ADR" "ns3::AdrMB":"MB-ADR"  "ns3::AdrKriging":"K-ADR"  "ns3::AdrEMA":"EMA-ADR" , "ns3::AdrGaussian":"G-ADR" "ns3::AdrFuzzyMB":"FADR-M", "ns3::AdrFuzzyRep":"FL-ADR"
-PcktsDayLst     = [72, 96, 144, 288]  # Esses valores em 'App period' equivalem a 300s,600s,900s e 1200s, respect.
-ModMobLst       = [0, 1, 2]
-EnvironmentLst  = [0, 1, 2]
 cenarioLgd      = 'Tipos de cenário: 0:numED, 1:numED multGw, 2:sideLength, 3:Pkts per day, 4:modMob, 5:classe Veloc'
-#metricasLst     = ['PDR', 'EneCon', 'EneEff', 'Latencia','CPSR']
-metricasDic     = {"PDR": "PDR", "EneCon":"Energy consumption (J)", "EneEff":"Energy efficiency (bits/J)", "Latencia":"Uplink latency (s)", "CPSR": "CPSR"}
-#metricasDic     = {"PDR": "PDR", "EneCon":"Energy consumption (J)", "EneEff":"Energy efficiency (bits/J)", "Latencia":"Uplink latency (s)", "PLR_I": "Collision Rate"}
+metricasDic     = {"PDR": "PDR", "EneCon":"Energy consumption (J)", "EneEff":"Energy efficiency (bits/J)", "Latencia":"Uplink latency (s)", "CPSR": "CPSR"} # Inserir "ColRate": "Collision Rate"
 PLRLst          = ['PLR_I', 'PLR_R', 'PLR_T','PLR_S']
-dimLblDic       = {'numED':'Number of End Devices',  'adrType':'ADR Scheme', 'sideLength':'Side Length', 'appPeriodSecs':'Packets per Day', 'mobModel':'Mobility Model'}
+
+dimDic          = { 'dim1' : [0], 'dim2' : [0] }      # Dicionário para armazenar os conjuntos de valores utilizados na simulação em 2 dimensões
+dimIdDic        = { 'dim1' : "", 'dim2' : ""  }
+trtmntLblDic    = {'numED':'Number of End Devices',  'adrType':'ADR Scheme', 'sideLength':'Side Length', 'pktsPerDay':'Packets per Day', 'mobModel':'Mobility Model', 'speedClass' : 'Speed Class'}
+trtmntDic = {
+    'adrType'        : {"ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"},    
+    'mobModel'       : {0: "Random Walk", 1: "Random Waypoint", 2:"GaussMarkov"},
+    'speedClass'     : {0: "Class 0", 1: "Class 1", 2:"Class 0"},
+    'okumuraEnvrmnt' : {0: "UrbanEnvironment", 1: "SubUrbanEnvironment", 2: "OpenAreasEnvironment"}
+}
+
+'''Esquemas ADR disponíveis: 
+"ns3::AdrLorawan":"ADR" 
+"ns3::AdrPlus":"ADR+" 
+"ns3::AdrPF":"PF-ADR"
+"ns3::AdrKalman":"M-ADR"
+"ns3::AdrMB":"MB-ADR"
+"ns3::AdrKriging":"K-ADR"
+"ns3::AdrFuzzyMB":"FADR-M"
+"ns3::AdrFuzzyRep":"FL-ADR"
+'''
 
 amostras        = {metric: [] for metric in metricasDic.keys()}
 dfMetricas      = {metric: pd.DataFrame() for metric in metricasDic.keys()} 
 dfPLR           = {metric: pd.DataFrame() for metric in PLRLst} 
 
-
 # -= Valores de referência. Não alterar (!) =-
-adrType         = list(AdrDic.keys())[:1]
+adrTypeDef      = list(trtmntDic['adrType'].keys())[0]  # Esquema ADR default: o 1º do dic.
 numED           = numEDLst[-1]/2  
 multiGw         = False
-#grafSuperf      = False
 GwDic           = {1:"1 Gateway"}  # Por padrão, os cenários são monoGW
 
 # Controle dos Gráficos
@@ -158,8 +167,7 @@ def reiniciarEstruturas():
     for ml in metricasDic.keys():
         dfMetricas[ml] = modelo.copy()
    
-    #print(f"REINIC. dfMetricas = \n {dfMetricas}")
-    
+ 
 
 
 def atualizarDados(dim1, dim2):
@@ -180,7 +188,7 @@ def atualizarDados(dim1, dim2):
     amostras[list(metricasDic.keys())[2]].append(effEne)
     amostras[list(metricasDic.keys())[3]].append(arqGP.iloc[0, 5])  # Latência
 
-    if modoConf:
+    if modoConfirm:
         arquivoGPC = glPcktCntConf + adrType + '.csv'
         arqGPC = pd.read_csv(arquivoGPC, header=None, sep=' ')   
         amostras['CPSR'].append(arqGPC.iloc[0, 2])  # CPSR
@@ -206,9 +214,6 @@ def atualizarDados(dim1, dim2):
             amostras[ml].clear()  # Limpa a lista para a próxima rodada'''
 
         #print(f"dfMetricas = \n{dfMetricas}")
-
-    
-
           
 
 def ajustarLstCenarios(parser):
@@ -219,13 +224,11 @@ def ajustarLstCenarios(parser):
     tipoCenario = args.arg1
 
     if (tipoCenario == 0 or tipoCenario == 1):
-        dimIdDic['dim1'] = list(dimLblDic.keys())[0]  #numED
+        dimIdDic['dim1'] = list(trtmntLblDic.keys())[0]  #numED
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
-        dimIdDic['dim2'] = list(dimLblDic.keys())[1]  #'ADR scheme'
-        dimDic['dim2'] = AdrDic.keys() if (tipoExecucao == 0) else list(AdrDic.keys())[:2]
+        dimIdDic['dim2'] = list(trtmntLblDic.keys())[1]  #adrType
+        dimDic['dim2'] = trtmntDic['adrType'].keys() if (tipoExecucao == 0) else list(trtmntDic['adrType'].keys())[:2]
         
-        
-
 
 
 def ajustarComandoSim(mob, gw, dim1, dim2 ):
@@ -243,12 +246,12 @@ def ajustarComandoSim(mob, gw, dim1, dim2 ):
     elif (tipoCenario == 4):
         numED = dim1
         modMob = dim2
-        adrType = list(AdrDic.keys())[:1]  # Apenas o 1º esquema
+        adrType = adrTypeDef  # Esquema ADR default
     elif (tipoCenario == 5):
         numED = dim1
         minSpeed = minSpeed[dim2]
         maxSpeed = maxSpeed[dim2]
-        adrType = list(AdrDic.keys())[:1]
+        adrType = adrTypeDef
     
     base_params = {
         '--nGw': str(gw),
@@ -261,12 +264,12 @@ def ajustarComandoSim(mob, gw, dim1, dim2 ):
         '--circArea': str(areaCirc).lower(),
         '--pathLossExp': str(pathLossExp),
         '--okumura': str(okumura).lower(),
-        '--environment': str(environment),
+        '--environment': str(okumuraEnvrmnt),
         '--mobEDProb': str(mob),
         '--mobModel': str(modMob),
         '--minSpeed': str(minSpeed),
         '--maxSpeed': str(maxSpeed),
-        '--confMode': str(modoConf).lower() 
+        '--confMode': str(modoConfirm).lower() 
     }
 
     params = " ".join([f"{k}={v}" for k, v in base_params.items()])
@@ -282,17 +285,16 @@ def plotarGraficos(mob, gw):
     
     # Obtem um gráfico para cada métrica
     for metK, metV in metricasDic.items():
-        if (metK == 'CPSR' and not modoConf):
+        if (metK == 'CPSR' and not modoConfirm):
             continue
 
         eixo_x = dfMetricas[metK].iloc[:, 0]   
         dados = dfMetricas[metK].iloc[:, 1:]   # Removendo o primeiro elemento de cada Series (que corresponde ao rótulo da coluna)
         dfMedia = dados.map(lambda lista: np.mean(lista))
-        dfDP = dados.map(lambda lista: np.std(lista, ddof=1))   
-        
+        dfDP = dados.map(lambda lista: np.std(lista, ddof=1))           
         z = norm.ppf(areaIC)
 
-        fig, ax = plt.subplots(figsize=(7, 6))  # Definindo o tamanho do gráfico
+        plt.subplots(figsize=(7, 6))  # Definindo o tamanho do gráfico
             
         marc = marcadores
         if not exibirMarc:
@@ -302,16 +304,17 @@ def plotarGraficos(mob, gw):
             eixo_y = dfMedia[coluna]
             desvio = dfDP[coluna]            
             erro_padrao = desvio / np.sqrt(numRep) * z  # Calcula o erro padrão 
-            cor = corLinhas[i % len(corLinhas)]        
+            cor = corLinhas[i % len(corLinhas)]            
+            lbl = trtmntDic[dimIdDic['dim2']][coluna]   # Obtem a respectiva legenda a partir da chave em dimIdDic['dim2']            
             
             plt.errorbar(eixo_x, eixo_y, yerr=erro_padrao, fmt='o', capsize=12, capthick=3, lw=4, color=cor, markersize=2) if barraErro else None
-            plt.plot(eixo_x, eixo_y, linestyle=estilos[i % len(estilos)], marker=marc[i % len(marc)], ms=10, lw=2.8, label=coluna, color=cor, markeredgecolor=corPreenc, mew=1.2)  # Adiciona uma linha para cada coluna
+            plt.plot(eixo_x, eixo_y, linestyle=estilos[i % len(estilos)], marker=marc[i % len(marc)], ms=10, lw=2.8, label=lbl, color=cor, markeredgecolor=corPreenc, mew=1.2)  # Adiciona uma linha para cada coluna
         
         plt.xticks(eixo_x, fontsize=tamFonteGraf, fontname=nomeFonte)
         plt.yticks(fontsize=tamFonteGraf, fontname=nomeFonte)
         plt.grid(axis='y', linestyle='--')         
 
-        plt.xlabel(dimLblDic[dimIdDic['dim1']], fontsize=tamFonteGraf, fontname=nomeFonte)
+        plt.xlabel(trtmntLblDic[dimIdDic['dim1']], fontsize=tamFonteGraf, fontname=nomeFonte)
         plt.ylabel(metV, fontsize=tamFonteGraf, fontname=nomeFonte)      
 
         # Legenda

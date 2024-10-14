@@ -9,9 +9,9 @@ pip3 install --upgrade numpy
 pip3 install --upgrade matplotlib
 
 mkdir scratch/output
-#mkdir scratch/output/data
-#mkdir scratch/output/plot
-./ns3 clean
+#./ns3 clean
 #./ns3 configure --enable-examples --enable-tests
-./ns3 configure -d optimized --enable-examples --enable-tests
-./ns3 build
+#./ns3 configure -d optimized --enable-examples --enable-tests
+#./ns3 build
+
+./ns3 clean && ./ns3 configure --enable-tests --enable-examples --enable-modules lorawan && ./ns3 build
