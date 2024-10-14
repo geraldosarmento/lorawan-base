@@ -103,7 +103,7 @@ intervaloST     = 2             # Intervalo no eixo x nos gráficos de ST em h (
 SFFinalED       = True         # Se plotar ou não gráficos com as atribuições finais de SF por ED
 energiaPorED    = True         # Se exibir o consumo médio por ED ou global na métrica EneCon
 efEnergEmKbits  = False         # Se exibir a medida de eficEnerg em Kbits/J ou bits/J
-multGWPar       = False          # MGP - modo MultGwPar para gerar gráficos pareados
+multGWPar       = True          # MGP - modo MultGwPar para gerar gráficos pareados
 
 # -= Arquivos =-
 outputFile     = ""
@@ -157,6 +157,9 @@ def executarSim():
             plotarGraficos(mob, gw)
             print(f"dfMetricas = \n{dfMetricas}")
             reiniciarEstruturas()
+
+        if (multGWPar):
+            plotarGraficosMGP(mob)
             
 
 
@@ -354,6 +357,70 @@ def plotarGraficos(mob, gw):
         plt.tight_layout()
         plt.savefig(f"{outputPath}Cen{tipoCenario}-{dimIdDic['dim1']}-{metK}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
         plt.close()
+
+# #lbl = f"{lbl}-{gwK}GW"          
+
+def plotarGraficosMGP(mob):
+    global marcadores
+    
+
+    # Obtem um gráfico para cada métrica
+    for metK, metV in metricasDic.items():
+
+        if (metK == 'CPSR' and not modoConfirm):
+            continue
+
+        cont = 0
+        plt.subplots(figsize=(7, 6))  # Definindo o tamanho do gráfico
+        for gwK, gwV in gwDic.items():
+
+            carregarDadosMetricasArq(mob, gwK)
+
+            eixo_x = dfMetricas[metK].iloc[:, 0]   
+            dados = dfMetricas[metK].iloc[:, 1:]   # Removendo o primeiro elemento de cada Series (que corresponde ao rótulo da coluna)
+            dfMedia = dados.map(lambda lista: np.mean(lista))
+            dfDP = dados.map(lambda lista: np.std(lista, ddof=1))           
+            z = norm.ppf(areaIC)           
+                
+            marc = marcadores
+            if not exibirMarc:
+                marc = [' ']
+
+            for i, coluna in enumerate(dfMedia.columns):
+                eixo_y = dfMedia[coluna]
+                desvio = dfDP[coluna]            
+                erro_padrao = desvio / np.sqrt(numRep) * z  # Calcula o erro padrão 
+                #cor = corLinhas[i % len(corLinhas)]            
+                
+                cor = corLinhas[cont % len(corLinhas)]
+                #est = estilos[i  % len(estilos)]
+                cont += 1
+
+                lbl = trtmntDic[dimIdDic['dim2']][coluna]   # Obtem a respectiva legenda a partir da chave em dimIdDic['dim2']            
+                lbl = f"{lbl}-{gwK}GW"
+
+                plt.errorbar(eixo_x, eixo_y, yerr=erro_padrao, fmt='o', capsize=12, capthick=3, lw=4, color=cor, markersize=2) if barraErro else None
+                plt.plot(eixo_x, eixo_y, linestyle=estilos[i % len(estilos)], marker=marc[i % len(marc)], ms=10, lw=2.8, label=lbl, color=cor, markeredgecolor=corPreenc, mew=1.2)  # Adiciona uma linha para cada coluna
+            
+        plt.xticks(eixo_x, fontsize=tamFonteGraf, fontname=nomeFonte)
+        plt.yticks(fontsize=tamFonteGraf, fontname=nomeFonte)
+        plt.grid(axis='y', linestyle='--')         
+
+        plt.xlabel(trtmntLblDic[dimIdDic['dim1']], fontsize=tamFonteGraf, fontname=nomeFonte)
+        plt.ylabel(metV, fontsize=tamFonteGraf, fontname=nomeFonte)      
+
+        # Legenda
+        legend_font = FontProperties(family=nomeFonte, style='normal', size=tamFonteGraf-3)
+        if legendaAcima:        
+            plt.legend(prop=legend_font, loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=len(dfMedia.columns))
+        else:        
+            leg = plt.legend(prop=legend_font)
+            leg.get_frame().set_alpha(0.5)  # Ajustando a transparência da legenda
+                
+        plt.tight_layout()
+        plt.savefig(f"{outputPath}Cen{tipoCenario}-{dimIdDic['dim1']}-{metK}-MbltProb{mob}-MultGwPar.png", bbox_inches='tight')
+        plt.close()    
+    
     
 ##### ARQUIVOS ######
 # Função para salvar um DF em um arquivo JSON
