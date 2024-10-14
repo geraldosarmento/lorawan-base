@@ -28,7 +28,7 @@ sideLength      = 10000
 areaCirc        = False
 numPeriods      = 1   #  1.125: whether consider warming time
 #simTime         = numPeriods * 24*60*60     # Não usar tempo menor que 2h (7200s)
-simTime         = 7200 #43200 #14400 #7200
+simTime         = 14400 # 9600 43200 14400 7200
 pktSize         = 30                      # 0 para usar valor default do módulo
 pktsPerDay      = 144
 appPeriod       = 86400/pktsPerDay
@@ -77,10 +77,14 @@ trtmntDic = {
 "ns3::AdrFuzzyRep":"FL-ADR"
 '''
 
-amostras        = {metric: [] for metric in metricasDic.keys()}
-dfMetricas      = {metric: pd.DataFrame() for metric in metricasDic.keys()} 
+
+dfMetricas      = {metric: pd.DataFrame() for metric in metricasDic.keys()}
 dfPLR           = {metric: pd.DataFrame() for metric in PLRDic.keys()} 
+amostrasMet     = {metric: [] for metric in metricasDic.keys()}
 amostrasPLR     = {metric: [] for metric in PLRDic.keys()}
+
+dfPDR_ST        = pd.DataFrame()
+amostrasPDR_ST  = []
 
 # -= Valores de referência. Não alterar (!) =-
 adrTypeDef      = list(trtmntDic['adrType'].keys())[0]  # Esquema ADR default: o 1º do dic.
@@ -118,7 +122,6 @@ phyPerf        = outputPath + 'phyPerf-'
 devStatus      = outputPath + 'deviceStatus-' 
 
 
-
 def executarSim(): 
     rodCont = 1   
     numTotRod = 0 
@@ -127,7 +130,7 @@ def executarSim():
     cmd = ""    
     apagarArqs(outputPath)
     reiniciarEstruturas()
-    #reiniciarEstruturasST() 
+    reiniciarEstruturasST() 
     #inicializarDictTempo()
 
     print(f"dimDic = \n{dimDic}")       
@@ -154,21 +157,21 @@ def executarSim():
                         agora = datetime.now()  
                         print(f"\nTempo de execução desta rodada: {round(tempoExec/60,2)} min. ({agora.strftime('%Y-%m-%d %H:%M:%S')})")                             
                         rodCont += 1
-
                         atualizarDados(dim1, dim2)
+                        atualizarDadosST(mob, gw, dim1, dim2, rep)
+                    
+                reiniciarEstruturasST()
             salvarDadosMetricasArq(mob, gw)
+            salvarDadosPLRArq(mob, gw)
             plotarGraficos(mob, gw)
             plotarGraficosPLR(mob, gw)
+            protarGraficoST(mob, gw)
             #print(f"dfMetricas = \n{dfMetricas}")
             reiniciarEstruturas()
 
         plotarGraficosMGP(mob) if (multiGw and multGWPar) else None
             
             
-
-
-
-
 def reiniciarEstruturas():
     global dfMetricas, dfPLR
 
@@ -183,43 +186,56 @@ def reiniciarEstruturas():
     for pl in PLRDic.keys():
         dfPLR[pl] = modelo.copy()    
 
+def reiniciarEstruturasST():
+    global dfPDR_ST, amostrasPDR_ST
+
+    modelo = pd.DataFrame()
+    modelo['Tempo'] = tempoLst
+    for d in dimDic['dim2']:
+        modelo[d] = [[] for _ in range(len(modelo))]
     
+    dfPDR_ST = modelo.copy()
+    amostrasPDR_ST.clear()
+
+    '''dfPDR_ST = pd.DataFrame()    
+    dfPDR_ST['Tempo'] = lstTempoH
+    for esq in dicAdr.keys():  
+        dfPDR_ST[dicAdr[esq]] = [[] for _ in range(len(dfPDR_ST))]  
+    amostrasPDR_ST = []
+    amostrasEne_ST = []'''
 
 
 def atualizarDados(dim1, dim2):
-    global dfMetricas, amostras
+    global dfMetricas, amostrasMet
 
     arquivoGP = glPcktCnt + adrType + '.csv'
     arqGP = pd.read_csv(arquivoGP, header=None, sep=' ') 
 
     # Adiciona novos dados às amostras
-    amostras[list(metricasDic.keys())[0]].append(arqGP.iloc[0, 2])  # PDR
+    amostrasMet[list(metricasDic.keys())[0]].append(arqGP.iloc[0, 2])  # PDR
     if energiaPorED:
-        amostras[list(metricasDic.keys())[1]].append(arqGP.iloc[0, -1])  # Energia por ED
+        amostrasMet[list(metricasDic.keys())[1]].append(arqGP.iloc[0, -1])  # Energia por ED
     else:
-        amostras[list(metricasDic.keys())[1]].append(arqGP.iloc[0, -2])  # Energia Total
+        amostrasMet[list(metricasDic.keys())[1]].append(arqGP.iloc[0, -2])  # Energia Total
     pacReceb = arqGP.iloc[0, 1]
     totEneCon = arqGP.iloc[0, -2]
     effEne = (pacReceb * pktSize * 8) / totEneCon
-    amostras[list(metricasDic.keys())[2]].append(effEne)
-    amostras[list(metricasDic.keys())[3]].append(arqGP.iloc[0, 5])  # Latência
+    amostrasMet[list(metricasDic.keys())[2]].append(effEne)
+    amostrasMet[list(metricasDic.keys())[3]].append(arqGP.iloc[0, 5])  # Latência
 
     if modoConfirm:
         arquivoGPC = glPcktCntConf + adrType + '.csv'
         arqGPC = pd.read_csv(arquivoGPC, header=None, sep=' ')   
-        amostras['CPSR'].append(arqGPC.iloc[0, 2])  # CPSR
+        amostrasMet['CPSR'].append(arqGPC.iloc[0, 2])  # CPSR
 
     # Verifica se temos amostras suficientes para atualizar
-    if len( amostras[list(metricasDic.keys())[0]] ) == numRep:
+    if len( amostrasMet[list(metricasDic.keys())[0]] ) == numRep:
         i = dimDic['dim1'].index(dim1)  # Índice para a linha
 
         for ml in metricasDic.keys():
-            dfMetricas[ml].at[i, dim2] = amostras[ml].copy()
-            amostras[ml].clear()
-            
-        #for ml in metricasDic.keys():
-        #    amostras[ml].clear() 
-    
+            dfMetricas[ml].at[i, dim2] = amostrasMet[ml].copy()
+            amostrasMet[ml].clear()
+       
     # Leitura do DF para PLR
     arquivoPhy = phyPerf + adrType + '.csv'
     arqPhy = pd.read_csv(arquivoPhy, header=None, sep=' ') 
@@ -247,8 +263,25 @@ def atualizarDados(dim1, dim2):
     
    #print(f"dfPLR = \n{dfPLR}")
 
-       
-       
+def atualizarDadosST (mob, gw, dim1, dim2, rep):
+    global dfPDR_ST, amostrasPDR_ST
+
+    arquivoGP = globalPerf + adrType + '.csv'
+    arqGP = pd.read_csv(arquivoGP, header=None, sep=' ') 
+    arqGP = arqGP.drop(0)
+    
+    amostrasPDR_ST.append( (arqGP[2]/arqGP[1]).tolist() )
+   
+    for i in range(0,len(dfPDR_ST['Tempo'])):
+        celulaPDR = dfPDR_ST.at[i,dim2]   
+        celulaPDR.append(amostrasPDR_ST[0][i])   
+        dfPDR_ST.at[i,dim2] = celulaPDR   
+    amostrasPDR_ST.clear()
+    
+    #print(f"dim2={dim2}, trtDic = \n{list(trtmntDic[dimIdDic['dim2']].keys())[-1]}")
+    if (rep == numRep-1) and (dim2 == dimDic['dim2'][-1]):    
+        dfPDR_ST.to_json(f"{outputPath}ST-{dimIdDic['dim1']}-{dim1}-MbltProb{mob}-{gw}Gw.json", orient='records')
+    
 def ajustarLstCenarios(parser):
     global tipoCenario, dimDic, dimIdDic
     
@@ -383,8 +416,7 @@ def plotarGraficos(mob, gw):
         plt.close()
 
 def plotarGraficosMGP(mob):
-    global marcadores
-    
+    global marcadores    
 
     # Obtem um gráfico para cada métrica
     for metK, metV in metricasDic.items():
@@ -449,9 +481,6 @@ def plotarGraficosPLR(mob, gw):
     if (not novaSim):
         carregarDadosPLRArq(mob, gw)
     
-    #eixo_x = dfMetricas[metK].iloc[:, 0]   
-    #dados = dfMetricas[metK].iloc[:, 1:]   # Removendo o primeiro elemento de cada Series (que corresponde ao rótulo da coluna)
-    
     eixo_x = dfMetricas['PDR'].iloc[:, 0]
     dfMedia_PDR = dfMetricas['PDR'].map(lambda lista: np.mean(lista))
     dfMedia_PLR_I = dfPLR['PLR_I'].map(lambda lista: np.mean(lista))
@@ -485,17 +514,51 @@ def plotarGraficosPLR(mob, gw):
         ax.set_yticks(np.arange(0, 1.1, 0.1))  # Define os ticks do eixo Y de 10 em 10        
         ax.yaxis.set_major_formatter(ticker.StrMethodFormatter("{x:.1f}"))         
          
-        # Legenda
         legend_font = FontProperties(family=nomeFonte, style='normal', size=tamFonteGraf-2)
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(reversed(handles), reversed(labels), loc='upper center', bbox_to_anchor=(0.5, 1.18), ncol=5, fontsize='large', handletextpad=0.2, handlelength=1.5, handleheight=1.8, columnspacing=0.8, frameon=False, prop=legend_font)
 
-        # Salva o gráfico em um arquivo
         plt.savefig(f"{outputPath}{dimIdDic['dim1']}-PLRbarra-{column}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
-        #plt.savefig(f"{outputPath}Cen{tipoCenario}-{dimIdDic['dim1']}-{metK}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
+        plt.close()
 
-        # Fecha a figura para liberar memória
-        plt.close()  
+def protarGraficoST(mob, gw):
+    for dim1 in dimDic['dim1']:
+        i = 0
+        plt.figure(figsize=(8, 6)) 
+        #plt.figure(figsize=(12, 6)) 
+        plt.grid(axis='y', linestyle='--', alpha=0.7, zorder=0)
+    
+        nomeArq = f"{outputPath}ST-{dimIdDic['dim1']}-{dim1}-MbltProb{mob}-{gw}Gw.json"            
+        dfPDR_ST = pd.read_json(nomeArq, orient='records')        
+        eixo_x = dfPDR_ST.iloc[:, 0] 
+        dados = dfPDR_ST.iloc[:, 1:]    
+        dfMedia = dados.map(lambda lista: np.mean(lista))    
+        z = norm.ppf(areaIC)
+
+        for dim2 in dimDic['dim2']:            
+            eixo_y = dfMedia[dim2]
+            cor = corLinhas[i % len(corLinhas)]
+            lbl = trtmntDic[dimIdDic['dim2']][dim2] 
+            plt.plot(eixo_x, eixo_y, linestyle=estilos[i % len(estilos)], marker=marcadores[i % len(marcadores)], label=lbl, color=cor, ms=6, lw=2.0, markeredgecolor=corPreenc,mew=1.0,zorder=3)  
+            i+=1
+        
+        eixo_x_ticks = np.arange(0, eixo_x.max() + 1, intervaloST)
+        plt.xticks(eixo_x_ticks,fontsize=tamFonteGraf-2, fontname=nomeFonte)  # Use os ticks espaçados
+        plt.yticks(fontsize=tamFonteGraf-2, fontname=nomeFonte)
+        plt.xlabel('Time (h)',fontsize=tamFonteGraf-2, fontname=nomeFonte)
+        plt.ylabel('PDR',fontsize=tamFonteGraf-2, fontname=nomeFonte) 
+        
+        legend_font = FontProperties(family=nomeFonte, style='normal', size=tamFonteGraf-4)
+        if legendaAcima:        
+            plt.legend(prop=legend_font, loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=len(dfMedia.columns))
+        else:        
+            leg = plt.legend(prop=legend_font)
+            leg.get_frame().set_alpha(0.5)  # Ajustando a transparência da legenda
+
+        plt.tight_layout()
+        #plt.grid(False)
+        plt.savefig(f"{outputPath}ST-{dimIdDic['dim1']}-{dim1}-MbltProb{mob}-{gw}Gw.png")        
+        plt.close()
     
 ##### ARQUIVOS ######
 # Função para salvar um DF em um arquivo JSON
@@ -569,6 +632,8 @@ def main():
         for mob in mobDic.keys(): 
             for gw in gwDic.keys():
                 plotarGraficos(mob, gw)
+                plotarGraficosPLR(mob, gw)
+                protarGraficoST(mob, gw)
             
 
 if __name__ == '__main__':
