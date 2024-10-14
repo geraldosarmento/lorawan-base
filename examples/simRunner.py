@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 # Sample script:  ./src/lorawan/examples/simRunner.py 0
 # Sample generated command: time ./ns3 run "littoral --adrType=ns3::AdrMB --simTime=86400" --quiet
-# 'Tipos de cenário: 0:numED, 1:numED multGw, 2:sideLength, 3:Pkts per day, 4:modMob, 5:classe Veloc'
+# 'Tipos de cenário: {0:'numED', 1:'sideLength', 2:'pktsPerDay', 3:'modMob', 4:'speedClass'}
 
 # -= Controle Geral =- 
 tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida (Teste)
@@ -44,9 +44,12 @@ modoConfirm     = False   # Caso True, ativa-se o modo confirmado e utiliza-se a
 
 # -= Listas, Dicionários e Estruturas de Dados =-
 numEDLst        = [200, 400, 600, 800, 1000]
+sideLengthLst   = [4000, 6000, 8000, 10000]
 pktsPerDayLst   = [72, 96, 144, 288]  # Esses valores em 'App period' equivalem a 300s,600s,900s e 1200s, respect.
+minSpeedLst     = [0.5, 3.5, 6.5]
+maxSpeedLst     = [3.0, 6.0, 9.0]
 MobDic          = {"1.0":"Mobile"} if (mobility) else {"0.0":"Static"}  # "0.5":"Semi-Mobile"
-cenarioLgd      = 'Tipos de cenário: 0:numED, 1:numED multGw, 2:sideLength, 3:Pkts per day, 4:modMob, 5:classe Veloc'
+cenarioLgdDic   = {0:'numED', 1:'sideLength', 2:'pktsPerDay', 3:'modMob', 4:'speedClass'}
 metricasDic     = {"PDR": "PDR", "EneCon":"Energy consumption (J)", "EneEff":"Energy efficiency (bits/J)", "Latencia":"Uplink latency (s)", "CPSR": "CPSR"} # Inserir "ColRate": "Collision Rate"
 PLRLst          = ['PLR_I', 'PLR_R', 'PLR_T','PLR_S']
 
@@ -56,9 +59,9 @@ trtmntLblDic    = {'numED':'Number of End Devices',  'adrType':'ADR Scheme', 'si
 trtmntDic = {
     'adrType'        : {"ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"},    
     'mobModel'       : {0: "Random Walk", 1: "Random Waypoint", 2:"GaussMarkov"},
-    'speedClass'     : {0: "Class 0", 1: "Class 1", 2:"Class 0"},
+    'speedClass'     : {0: "Speed Class 0", 1: "Speed Class 1", 2:"Speed Class 0"},
     'okumuraEnvrmnt' : {0: "UrbanEnvironment", 1: "SubUrbanEnvironment", 2: "OpenAreasEnvironment"}
-}
+}  # A variável registrada em dim2 precisa ter uma entrada nesse dicionário
 
 '''Esquemas ADR disponíveis: 
 "ns3::AdrLorawan":"ADR" 
@@ -77,7 +80,7 @@ dfPLR           = {metric: pd.DataFrame() for metric in PLRLst}
 
 # -= Valores de referência. Não alterar (!) =-
 adrTypeDef      = list(trtmntDic['adrType'].keys())[0]  # Esquema ADR default: o 1º do dic.
-numED           = numEDLst[-1]/2  
+numED           = int(numEDLst[-1]/2)
 multiGw         = False
 GwDic           = {1:"1 Gateway"}  # Por padrão, os cenários são monoGW
 
@@ -123,18 +126,19 @@ def executarSim():
     #reiniciarEstruturasST() 
     #inicializarDictTempo()
 
-    #print(f"dimDic = \n{dimDic}")       
-    #print(f"dimIdDic = \n{dimIdDic}")       
-        
+    print(f"dimDic = \n{dimDic}")       
+    print(f"dimIdDic = \n{dimIdDic}")       
+    
+    print(f"Cenário selecionado: {cenarioLgdDic[tipoCenario]}.")   
     for mob in MobDic.keys(): 
         for gw in GwDic.keys():
             for dim1 in dimDic['dim1']:
                 for dim2 in dimDic['dim2']:                    
                     for rep in range(numRep):
                         numTotRod = len(MobDic)*len(GwDic)*len(dimDic['dim1'])*len(dimDic['dim2'])*numRep
-                        print("===============================================================================================================")
+                        print("==================================================================================================================")
                         print(f"   Ensaio atual: {dimIdDic['dim1']}={dim1} | {dimIdDic['dim2']}={dim2} - NumGw: {gw} - Mobilidade:{'Sim' if (float(mob)>0) else 'Não'} - Rep: {rep+1} - Rodada: {rodCont} de {numTotRod}")
-                        print("===============================================================================================================")
+                        print("==================================================================================================================")
                         cmd = ajustarComandoSim(mob, gw, dim1, dim2)
                         print (f"Comando submetido: {cmd}")
                         print (f"Executando simulação...")
@@ -152,6 +156,7 @@ def executarSim():
             plotarGraficos(mob, gw)
             #plotar gráficos (carregando dados dos arquivos)
             #reiniciar estruturas
+            print(f"dfMetricas = \n{dfMetricas}")
 
 
 
@@ -217,40 +222,60 @@ def atualizarDados(dim1, dim2):
           
 
 def ajustarLstCenarios(parser):
-    global dimDic, dimIdDic
+    global tipoCenario, dimDic, dimIdDic
     
-    parser.add_argument('arg1', type=int, help=cenarioLgd)    
+    parser.add_argument('arg1', type=int, help=str(cenarioLgdDic))    
     args = parser.parse_args()
     tipoCenario = args.arg1
 
-    if (tipoCenario == 0 or tipoCenario == 1):
-        dimIdDic['dim1'] = list(trtmntLblDic.keys())[0]  #numED
+    if (tipoCenario == 0):
+        dimIdDic['dim1'] = 'numED'
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
-        dimIdDic['dim2'] = list(trtmntLblDic.keys())[1]  #adrType
+        dimIdDic['dim2'] = 'adrType'
         dimDic['dim2'] = trtmntDic['adrType'].keys() if (tipoExecucao == 0) else list(trtmntDic['adrType'].keys())[:2]
+    elif (tipoCenario == 1):
+        dimIdDic['dim1'] = 'sideLength'
+        dimDic['dim1'] = sideLengthLst if (tipoExecucao == 0) else sideLengthLst[-2:]
+        dimIdDic['dim2'] = 'adrType'
+        dimDic['dim2'] = trtmntDic['adrType'].keys() if (tipoExecucao == 0) else list(trtmntDic['adrType'].keys())[:2]
+    elif (tipoCenario == 2):
+        dimIdDic['dim1'] = 'pktsPerDay'
+        dimDic['dim1'] = pktsPerDayLst if (tipoExecucao == 0) else pktsPerDayLst[-2:]
+        dimIdDic['dim2'] = 'adrType'
+        dimDic['dim2'] = trtmntDic['adrType'].keys() if (tipoExecucao == 0) else list(trtmntDic['adrType'].keys())[:2]
+    elif (tipoCenario == 3):
+        dimIdDic['dim1'] = 'numED'
+        dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
+        dimIdDic['dim2'] = 'mobModel'
+        dimDic['dim2'] = trtmntDic['mobModel'].keys() if (tipoExecucao == 0) else list(trtmntDic['mobModel'].keys())[:2]
+    elif (tipoCenario == 4):
+        dimIdDic['dim1'] = 'numED'
+        dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
+        dimIdDic['dim2'] = 'speedClass'
+        dimDic['dim2'] = trtmntDic['speedClass'].keys() if (tipoExecucao == 0) else list(trtmntDic['speedClass'].keys())[:2]
         
 
 
 def ajustarComandoSim(mob, gw, dim1, dim2 ):
     global numED, adrType, sideLength, pktsPerDay, modMob, minSpeed, maxSpeed
 
-    if (tipoCenario == 0 or tipoCenario == 1):
+    if (tipoCenario == 0):
         numED = dim1
         adrType = dim2
-    elif (tipoCenario == 2):
+    elif (tipoCenario == 1):
         sideLength = dim1
         adrType = dim2
-    elif (tipoCenario == 3):
+    elif (tipoCenario == 2):
         pktsPerDay = dim1
         adrType = dim2
-    elif (tipoCenario == 4):
+    elif (tipoCenario == 3):
         numED = dim1
         modMob = dim2
         adrType = adrTypeDef  # Esquema ADR default
-    elif (tipoCenario == 5):
+    elif (tipoCenario == 4):
         numED = dim1
-        minSpeed = minSpeed[dim2]
-        maxSpeed = maxSpeed[dim2]
+        minSpeed = minSpeedLst[dim2]
+        maxSpeed = maxSpeedLst[dim2]
         adrType = adrTypeDef
     
     base_params = {
