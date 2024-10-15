@@ -28,7 +28,7 @@ sideLength      = 10000
 areaCirc        = False
 numPeriods      = 1   #  1.125: whether consider warming time
 #simTime         = numPeriods * 24*60*60     # Não usar tempo menor que 2h (7200s)
-simTime         = 14400 # 9600 43200 14400 7200
+simTime         = 28800 # 7200 9600 14400 28800 43200
 pktSize         = 30                      # 0 para usar valor default do módulo
 pktsPerDay      = 144
 appPeriod       = 86400/pktsPerDay
@@ -90,7 +90,8 @@ amostrasPDR_ST  = []
 adrTypeDef      = list(trtmntDic['adrType'].keys())[0]  # Esquema ADR default: o 1º do dic.
 numED           = int(numEDLst[-1]/2)
 tempoLst        = list(range(1, int(simTime/3600) + 1))  # lista contendo as horas de simulação para ST
-gwDic           = {1:"1 Gateway"} if (not multiGw) else  {1:"1 Gateway", 2:"2 Gateways"} 
+gwDic           = {1:"1 Gateway"} if (not multiGw) else  {1:"1 Gateway", 2:"2 Gateways"}
+contagemSF      = {7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0} 
 
 # Controle dos Gráficos
 tamFonteGraf    = 20
@@ -159,13 +160,14 @@ def executarSim():
                         rodCont += 1
                         atualizarDados(dim1, dim2)
                         atualizarDadosST(mob, gw, dim1, dim2, rep)
-                    
+                        atualizarDadosSfFinal(mob, gw, dim1, dim2, rep)                    
                 reiniciarEstruturasST()
             salvarDadosMetricasArq(mob, gw)
             salvarDadosPLRArq(mob, gw)
             plotarGraficos(mob, gw)
             plotarGraficosPLR(mob, gw)
             protarGraficoST(mob, gw)
+            plotarSFFinalPorc(mob, gw)
             #print(f"dfMetricas = \n{dfMetricas}")
             reiniciarEstruturas()
 
@@ -281,6 +283,24 @@ def atualizarDadosST (mob, gw, dim1, dim2, rep):
     #print(f"dim2={dim2}, trtDic = \n{list(trtmntDic[dimIdDic['dim2']].keys())[-1]}")
     if (rep == numRep-1) and (dim2 == dimDic['dim2'][-1]):    
         dfPDR_ST.to_json(f"{outputPath}ST-{dimIdDic['dim1']}-{dim1}-MbltProb{mob}-{gw}Gw.json", orient='records')
+
+def atualizarDadosSfFinal(mob, gw, dim1, dim2, rep):
+    global contagemSF
+
+    arquivoDS = devStatus + adrType + '.csv'
+    SFdf = pd.read_csv(arquivoDS, sep=' ', header=None, skiprows=lambda x: x < len(pd.read_csv(arquivoDS, sep=' ', header=None)) - numED)
+    valores = SFdf[4]
+    valores = 12 - valores  # Converte DR para SF
+    for valor in valores:
+        if valor in contagemSF:
+            contagemSF[valor] += 1
+ 
+    if (rep == numRep-1):
+        mediaSF = {sf: (contagemSF[sf] / (numED*numRep)) * 100 for sf in contagemSF}        
+        mediaSF_df = pd.DataFrame(list(mediaSF.items()), columns=['SF', 'Percentage'])
+        mediaSF_df.to_json(f"{outputPath}{dimIdDic['dim1']}-{dim1}-SFFinal{dim2}-MbltProb{mob}-{gw}Gw.json", orient='records')
+        contagemSF = {7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0}    # reinicia a contagem
+        print(f'mediaSF = \n{mediaSF}')
     
 def ajustarLstCenarios(parser):
     global tipoCenario, dimDic, dimIdDic
@@ -559,6 +579,59 @@ def protarGraficoST(mob, gw):
         #plt.grid(False)
         plt.savefig(f"{outputPath}ST-{dimIdDic['dim1']}-{dim1}-MbltProb{mob}-{gw}Gw.png")        
         plt.close()
+
+def plotarSFFinalPorc(mob, gw):    
+    for dim1 in dimDic['dim1']:
+        dados_sf = {sf: [] for sf in range(7, 13)} 
+        fig, ax = plt.subplots(figsize=(8, 6))        
+        # Primeiro desenha o grid
+        ax.grid(axis='y', linestyle='--', alpha=0.7, zorder=0) 
+        
+        width = 0.185  # Largura das barras
+        x = np.arange(7, 13)  # Valores de SF (7 a 12)
+
+        for idx, dim2 in enumerate(dimDic['dim2']):
+            mediaSfDF = pd.read_json(f"{outputPath}{dimIdDic['dim1']}-{dim1}-SFFinal{dim2}-MbltProb{mob}-{gw}Gw.json", orient='records')    
+            mediaSf = mediaSfDF.set_index('SF')['Percentage'].to_dict()            
+            lbl = trtmntDic[dimIdDic['dim2']][dim2] 
+
+            for sf in range(7, 13):
+                if sf in mediaSf:
+                    dados_sf[sf].append(mediaSf[sf])
+                else:
+                    dados_sf[sf].append(0)
+
+            ax.bar(x + idx * width, [dados_sf[sf][idx] for sf in range(7, 13)], width=width, edgecolor='black',
+                color=corLinhas[idx], label=lbl, hatch=padroesHachura[idx % len(padroesHachura)], zorder=3)
+
+        # Configurações do gráfico
+        ax.set_xlabel('SF', fontsize=tamFonteGraf, fontname=nomeFonte)
+        ax.set_ylabel('Percentage (%)', fontsize=tamFonteGraf, fontname=nomeFonte)
+
+        # Configurações dos ticks do eixo X
+        #ax.set_xticks(x + width * (len(dim2) - 1) / 2)
+        ax.set_xticks(x + width * (len(dimDic['dim2']) - 1) / 2) 
+        ax.set_xticklabels(range(7, 13), fontsize=tamFonteGraf, fontname=nomeFonte)
+
+        # Calcula o maior valor e ajusta o limite do eixo Y
+        max_value = max(max(dados_sf[sf]) for sf in range(7, 13))
+        y_upper_limit = np.ceil(max_value / 10) * 10  # Arredonda para a dezena mais próxima
+        ax.set_ylim(0, y_upper_limit)
+
+        # Configurações dos ticks do eixo Y
+        ax.set_yticks(np.arange(0, y_upper_limit + 10, 10))  # Define os ticks do eixo Y
+        ax.tick_params(axis='y', labelsize=tamFonteGraf)
+
+        plt.xticks(fontsize=tamFonteGraf, fontname=nomeFonte)
+        plt.yticks(fontsize=tamFonteGraf, fontname=nomeFonte)
+
+        # Adiciona a legenda
+        legend_font = FontProperties(family=nomeFonte, style='normal', size=tamFonteGraf-4)
+        ax.legend(loc='upper center', prop=legend_font, handlelength=1.4, handleheight=1.2)
+
+        plt.tight_layout()
+        plt.savefig(f"{outputPath}{dimIdDic['dim1']}-{dim1}-SFFinal{dim2}-MbltProb{mob}-{gw}Gw.png")
+        plt.close()
     
 ##### ARQUIVOS ######
 # Função para salvar um DF em um arquivo JSON
@@ -634,6 +707,7 @@ def main():
                 plotarGraficos(mob, gw)
                 plotarGraficosPLR(mob, gw)
                 protarGraficoST(mob, gw)
+                plotarSFFinalPorc(mob, gw)
             
 
 if __name__ == '__main__':
