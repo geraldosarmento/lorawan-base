@@ -19,24 +19,24 @@ import matplotlib.pyplot as plt
 tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida (Teste)
 tipoCenario      = 0      # Default
 novaSim          = True   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
-backupOutputDir  = False   # Realiza um backup local dos resultados
+backupOutputDir  = True   # Realiza um backup local dos resultados
 
 
 # -= Parâmetros de Simulação =-
-numRep          = 10 if (tipoExecucao == 0) else 2
+numRep          = 10 if (tipoExecucao == 0) else 3
 sideLength      = 10000
 areaCirc        = False
 numPeriods      = 1   #  1.125: whether consider warming time
 #simTime         = numPeriods * 24*60*60     # Não usar tempo menor que 2h (7200s)
-simTime         = 28800 # 7200 9600 14400 28800 43200
+simTime         = 43200 # 7200 9600 14400 28800 43200
 pktSize         = 30                      # 0 para usar valor default do módulo
 pktsPerDay      = 144
 appPeriod       = 86400/pktsPerDay
 mobility        = True
 multiGw         = False
-modMob          = 0    # 0: RandomWalk, 1: RandomWaypoint, 2: GaussMarkov
-minSpeed        = 6.5  # def: 0.5
-maxSpeed        = 9.0  # def: 1.5
+modMob          = 0    
+minSpeed        = 3.5  # def: 0.5
+maxSpeed        = 6.0  # def: 1.5
 pathLossExp     = 3.76
 areaIC          = 0.975  # área gaussina para um intervalo de confiança bilateral de 95% 
 okumura         = False
@@ -61,9 +61,9 @@ dimIdDic        = { 'dim1' : "", 'dim2' : ""  }
 trtmntLblDic    = {'numED':'Number of End Devices',  'adrType':'ADR Scheme', 'sideLength':'Side Length', 'pktsPerDay':'Packets per Day', 'mobModel':'Mobility Model', 'speedClass' : 'Speed Class'}
 trtmntDic = {
     'adrType'        : {"ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"},    
-    'mobModel'       : {0: "Random Walk", 1: "Random Waypoint", 2:"GaussMarkov"},
-    'speedClass'     : {0: "Speed Class 0", 1: "Speed Class 1", 2:"Speed Class 0"},
-    'okumuraEnvrmnt' : {0: "UrbanEnvironment", 1: "SubUrbanEnvironment", 2: "OpenAreasEnvironment"}
+    'mobModel'       : {'0': "Random Walk", '1': "Random Waypoint", '2':"Gauss Markov"},
+    'speedClass'     : {'0': "Speed Class 0", '1': "Speed Class 1", '2':"Speed Class 0"},
+    'okumuraEnvrmnt' : {'0': "UrbanEnvironment", '1': "SubUrbanEnvironment", '2': "OpenAreasEnvironment"}
 }  # A variável registrada em dim2 precisa ter uma entrada nesse dicionário
 
 '''Esquemas ADR disponíveis: 
@@ -82,9 +82,9 @@ dfMetricas      = {metric: pd.DataFrame() for metric in metricasDic.keys()}
 dfPLR           = {metric: pd.DataFrame() for metric in PLRDic.keys()} 
 amostrasMet     = {metric: [] for metric in metricasDic.keys()}
 amostrasPLR     = {metric: [] for metric in PLRDic.keys()}
-
 dfPDR_ST        = pd.DataFrame()
 amostrasPDR_ST  = []
+dfTmpExc        = pd.DataFrame()
 
 # -= Valores de referência. Não alterar (!) =-
 adrTypeDef      = list(trtmntDic['adrType'].keys())[0]  # Esquema ADR default: o 1º do dic.
@@ -132,10 +132,10 @@ def executarSim():
     apagarArqs(outputPath)
     reiniciarEstruturas()
     reiniciarEstruturasST() 
-    #inicializarDictTempo()
+    inicializarDictTempo()
 
-    print(f"dimDic = \n{dimDic}")       
-    print(f"dimIdDic = \n{dimIdDic}")       
+    #print(f"dimDic = \n{dimDic}")       
+    #print(f"dimIdDic = \n{dimIdDic}")       
     
     print(f"Cenário selecionado: {cenarioLgdDic[tipoCenario]}.")   
     for mob in mobDic.keys(): 
@@ -160,8 +160,10 @@ def executarSim():
                         rodCont += 1
                         atualizarDados(dim1, dim2)
                         atualizarDadosST(mob, gw, dim1, dim2, rep)
-                        atualizarDadosSfFinal(mob, gw, dim1, dim2, rep)                    
+                        atualizarDadosSfFinal(mob, gw, dim1, dim2, rep)
+                        atualizarDictTempo(dim1, dim2, tempoExec)
                 reiniciarEstruturasST()
+                print(obterRelatorio(cmd))
             salvarDadosMetricasArq(mob, gw)
             salvarDadosPLRArq(mob, gw)
             plotarGraficos(mob, gw)
@@ -169,9 +171,11 @@ def executarSim():
             protarGraficoST(mob, gw)
             plotarSFFinalPorc(mob, gw)
             #print(f"dfMetricas = \n{dfMetricas}")
+            gerarRelatorioFinal(mob, gw, cmd)
             reiniciarEstruturas()
 
         plotarGraficosMGP(mob) if (multiGw and multGWPar) else None
+    registrarTempoMedio()
             
             
 def reiniciarEstruturas():
@@ -300,7 +304,24 @@ def atualizarDadosSfFinal(mob, gw, dim1, dim2, rep):
         mediaSF_df = pd.DataFrame(list(mediaSF.items()), columns=['SF', 'Percentage'])
         mediaSF_df.to_json(f"{outputPath}{dimIdDic['dim1']}-{dim1}-SFFinal{dim2}-MbltProb{mob}-{gw}Gw.json", orient='records')
         contagemSF = {7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0}    # reinicia a contagem
-        print(f'mediaSF = \n{mediaSF}')
+
+def inicializarDictTempo():
+    global dfTmpExc
+   
+    modelo = pd.DataFrame()
+    modelo[dimIdDic['dim1']] = dimDic['dim1']  #1a coluna: ensaio dim1 - eixo x dos gráficos
+    for d in dimDic['dim2']:
+        modelo[d] = float(0)
+    dfTmpExc = modelo.copy()
+
+def atualizarDictTempo(dim1,dim2,tempo):
+    global dfTmpExc
+    dfTmpExc.at[dimDic['dim1'].index(dim1), dim2] += tempo    
+
+def registrarTempoMedio():
+    global dfTmpExc
+    dfTmpExc.iloc[:, 1:] = dfTmpExc.iloc[:, 1:] / numRep
+    dfTmpExc.to_csv(f'{outputPath}tempoMedioExec.csv', index=True)
     
 def ajustarLstCenarios(parser):
     global tipoCenario, dimDic, dimIdDic
@@ -355,8 +376,8 @@ def ajustarComandoSim(mob, gw, dim1, dim2 ):
         adrType = adrTypeDef  # Esquema ADR default
     elif (tipoCenario == 4):
         numED = dim1
-        minSpeed = minSpeedLst[dim2]
-        maxSpeed = maxSpeedLst[dim2]
+        minSpeed = minSpeedLst[int(dim2)]
+        maxSpeed = maxSpeedLst[int(dim2)]
         adrType = adrTypeDef
     
     base_params = {
@@ -680,6 +701,70 @@ def backupData(path):
             os.remove(os.path.join(root, file))
     print(f"Backup criado em: {backup_dir}")
 
+##### MISC ######
+def obterRelatorio(relFinal=False):
+    saida = ""
+
+    for metK, metV in metricasDic.items():
+        if (metK == 'CPSR' and not modoConfirm):
+            continue
+
+        dados = dfMetricas[metK].copy()
+        dados = dados.dropna()
+        dim1 = dados.iloc[:, 0]
+        dados = dados.iloc[:, 1:]
+        #print(f"dados = \n{dados}")
+        
+        dfMedia = dados.map(lambda lista: np.mean(lista))        
+        dfDP = dados.map(lambda lista: np.std(lista, ddof=1))
+        
+        # Valor crítico para um intervalo de confiança de 95%
+        z = norm.ppf(areaIC)  # 0.975 para a área de 0.025 em cada cauda
+        # Cálculo do erro do intervalo de confiança
+        erro_IC = (dfDP / np.sqrt(numRep)) * z        
+        
+        saida += ":::::::::::::::::::::::::::::::::::::::::::::::::::::\n"
+        saida += f"Resultado para métrica: {metK}.\n"
+        saida += "Média: \n"
+        #saida += str(dfMedia) + "\n"
+        saida += str(pd.concat([dim1, dfMedia], axis=1)) + "\n"
+        saida += "DesvPdr: \n"
+        #saida += str(dfDP) + "\n"
+        saida += str(pd.concat([dim1, dfDP], axis=1)) + "\n"
+        saida += "Erro IC: \n"
+        #saida += str(erro_IC) + "\n"
+        saida += str(pd.concat([dim1, erro_IC], axis=1)) + "\n"
+
+        if relFinal:
+            for i in range(1, dfMedia.shape[1]):            
+                resultado =      dfMedia.iloc[:, 0] - dfMedia.iloc[:, i]
+                resultadoPerc = (dfMedia.iloc[:, 0] - dfMedia.iloc[:, i])/dfMedia.iloc[:, i] * 100                
+                meanResPer    = resultadoPerc.mean()
+                resultadoPerc = resultadoPerc.astype(str) + '%'
+                saida += f"\nDiferença de {metK} entre {dfMedia.columns[0]} e {dfMedia.columns[i]}:\n{round(resultado,7)}\n"
+                saida += f"\nDiferença perc.  de {metK} entre {dfMedia.columns[0]} e {dfMedia.columns[i]}:\n{round(resultadoPerc,7)} \n"
+                saida += f"===> Diferença média: {round(resultado.mean(),7)} \n"                                
+                saida += f"===> Diferença média perc.: {round(meanResPer,7)}% \n" 
+    saida += ":::::::::::::::::::::::::::::::::::::::::::::::::::::\n"
+    
+    return saida
+
+def gerarRelatorioFinal(mob, gw, cmd=""):
+    global outputFile
+
+    outputFile = f"{outputPath}RELATORIO_FINAL_MbltProb{mob}_{gw}Gw.dat"
+    if (not novaSim):
+        outputFile = f"{outputPath}RELATORIO_FINAL_v2_MbltProb{mob}_{gw}Gw.dat"
+    arquivo = open(outputFile, "w")    
+    arquivo.write(f":::::::::::::::::::::::::::::::::::::::::::::::::::::\n")
+    arquivo.write(f"::::  RESULTADO FINAL - Mblt prob:{mob} {gw}Gw  ::::\n")
+    arquivo.write(obterRelatorio(True))   
+    if (cmd != ""):
+        arquivo.write(f":::::::::::::::::::::::::::::::::::::::::::::::::::::\n")    
+        arquivo.write(f"Último comando: {cmd}")
+        arquivo.write(f":::::::::::::::::::::::::::::::::::::::::::::::::::::\n")
+    arquivo.close()
+
 def main():    
     #global dfPDR, dfCPSR, dfEneCon, dfEneEff, dfLatencia, dfPDR_ST       
      
@@ -695,9 +780,9 @@ def main():
         tempo_decorrido /= 60
         msgFinal = f"\n\nTempo total de simulação: {round(tempo_decorrido,2)} min"
         print(msgFinal)
-        '''arq = open(outputFile, 'a')
+        arq = open(outputFile, 'a')
         arq.write(msgFinal)
-        arq.close()'''
+        arq.close()
         backupData(outputPath) if backupOutputDir else None  # Realiza uma cópia do diretório de saída
     else:                           
         print("Replotando gráficos...")
@@ -708,6 +793,7 @@ def main():
                 plotarGraficosPLR(mob, gw)
                 protarGraficoST(mob, gw)
                 plotarSFFinalPorc(mob, gw)
+                gerarRelatorioFinal(mob, gw, "")
             
 
 if __name__ == '__main__':

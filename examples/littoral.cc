@@ -33,6 +33,7 @@
 #include "ns3/pointer.h"
 #include "ns3/position-allocator.h"
 #include "ns3/random-variable-stream.h"
+#include "ns3/random-waypoint-mobility-model.h"
 #include "ns3/rectangle.h"
 #include "ns3/simulator.h"
 #include "ns3/string.h"
@@ -80,12 +81,12 @@ bool const saveToFile = true;
 
 //-- Mobility Parameters --// 
 enum mobilityModel {
-    RandomWalk      = 0,
-    RandomWaypoint  = 1,
-    GaussMarkov     = 2
+    RandomWalk                 = 0,
+    SteadyStateRandomWaypoint  = 1,
+    GaussMarkov                = 2
 };
 
-double mobileNodeProbability = 0.0;
+double mobileNodeProbability = 1.0;
 double minSpeed = 0.5;
 double maxSpeed = 1.5;
 double maxRandomLoss = 10;
@@ -240,6 +241,8 @@ main(int argc, char* argv[])
 
     // Set the end devices to allow data rate control (i.e. adaptive data rate) from the NS
     Config::SetDefault("ns3::EndDeviceLorawanMac::DRControl", BooleanValue(NSadrEnabled));
+
+    //LogComponentEnable("RandomWaypointMobilityModel", LOG_LEVEL_ALL);
 
     /************************
      *  Create the channel  *
@@ -459,28 +462,27 @@ main(int argc, char* argv[])
                                                                        "Max",
                                                                        DoubleValue(maxSpeed))));
     }
-    else if (mobModel == RandomWaypoint) {
+    else if (mobModel == SteadyStateRandomWaypoint) {
+        //std::cout << "SteadyStateRandomWaypointMobilityModel selecionado." << std::endl;        
         mobilityEd.SetMobilityModel(
-        "ns3::RandomWaypointMobilityModel",
-        "Pause",
-        PointerValue(CreateObjectWithAttributes<UniformRandomVariable>("Min",
-                                                                       DoubleValue(0),
-                                                                       "Max",
-                                                                       DoubleValue(2.0))),    
-        "Speed",
-        PointerValue(CreateObjectWithAttributes<UniformRandomVariable>("Min",
-                                                                       DoubleValue(minSpeed),
-                                                                       "Max",
-                                                                       DoubleValue(maxSpeed))));
-
+        "ns3::SteadyStateRandomWaypointMobilityModel",
+        "MinSpeed", DoubleValue(minSpeed),
+        "MaxSpeed", DoubleValue(maxSpeed),
+        "MinPause", DoubleValue(0),
+        "MaxPause", DoubleValue(2.0),
+        "MinX", DoubleValue(-sideLength/2),
+        "MaxX", DoubleValue(sideLength/2),
+        "MinY", DoubleValue(-sideLength/2),
+        "MaxY", DoubleValue(sideLength/2),
+        "Z", DoubleValue(edHeight));
     }
     else if (mobModel == GaussMarkov) {
         mobilityEd.SetMobilityModel(
         "ns3::GaussMarkovMobilityModel",
         "Bounds",        
         BoxValue(Box(-sideLength/2, sideLength/2, -sideLength/2, sideLength/2, 0, edHeight)),
-        "TimeStep", TimeValue(Seconds(1.0)),
-        "Alpha", DoubleValue(1.0),
+        "TimeStep", TimeValue(Seconds(2.0)),
+        "Alpha", DoubleValue(0.5),
         "MeanDirection",
         PointerValue(CreateObjectWithAttributes<UniformRandomVariable>("Min",
                                                                        DoubleValue(0),
@@ -496,6 +498,7 @@ main(int argc, char* argv[])
    
     for (int i = fixedPositionNodes; i < (int)endDevices.GetN(); ++i)
     {
+        
         mobilityEd.Install(endDevices.Get(i));
         // Adjusting ED height 
         Ptr<MobilityModel> mobility = endDevices.Get (i)->GetObject<MobilityModel> ();
@@ -505,7 +508,7 @@ main(int argc, char* argv[])
         //std::cout << "Mobilidade no nó : " << endDevices.Get(i)->GetId() << std::endl;
     }
     //std::cout << "Modelo de mobilidade aplicado : " << mobModel << std::endl;
-      
+    
     /*
     //Printing ED pos / speed
     for (NodeContainer::Iterator j = endDevices.Begin(); j != endDevices.End(); ++j)
