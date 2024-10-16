@@ -11,19 +11,21 @@ from scipy.interpolate import griddata
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
-# Sample script:  ./src/lorawan/examples/simRunner.py 0
-# Sample generated command: time ./ns3 run "littoral --adrType=ns3::AdrMB --simTime=86400" --quiet
+# Ex.:  ./src/lorawan/examples/simRunner.py 0
+# Exemplo de chamada em lote: ./src/lorawan/examples/simRunner.py 3 && ./src/lorawan/examples/simRunner.py 4
+# Ex. de comando gerado: time ./ns3 run "littoral --adrType=ns3::AdrMB --simTime=86400" --quiet
 # 'Tipos de cenário: {0:'numED', 1:'sideLength', 2:'pktsPerDay', 3:'modMob', 4:'speedClass'}
 
-# TO DO:
-# - Incluir grafico de superficie -> requer dim3
+# TO DO: 
+# - Ajustar bordas grafSuperf
 
 # -= Controle Geral =- 
 tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida (Teste)
 tipoCenario      = 0      # Default
 novaSim          = True   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
-backupOutputDir  = False   # Realiza um backup local dos resultados
+backupOutputDir  = True   # Realiza um backup local dos resultados
 
 
 # -= Parâmetros de Simulação =-
@@ -32,7 +34,7 @@ sideLength      = 10000
 areaCirc        = False
 numPeriods      = 1   #  1.125: whether consider warming time
 #simTime         = numPeriods * 24*60*60     # Não usar tempo menor que 2h (7200s)
-simTime         = 7200 # 7200 9600 14400 28800 43200
+simTime         = 28800 # 7200 9600 14400 28800 43200
 pktSize         = 30                      # 0 para usar valor default do módulo
 pktsPerDay      = 144
 appPeriod       = 86400/pktsPerDay
@@ -46,8 +48,6 @@ areaIC          = 0.975  # área gaussina para um intervalo de confiança bilate
 okumura         = False
 okumuraEnvrmnt  = 0      # 0: UrbanEnvironment, 1: SubUrbanEnvironment, 2: OpenAreasEnvironment. Só tem efeito quando 'okumura = "true" '
 modoConfirm     = False   # Caso True, ativa-se o modo confirmado e utiliza-se a métrica CPSR
-
-
 
 # -= Listas, Dicionários e Estruturas de Dados =-
 numEDLst        = [200, 400, 600, 800, 1000]
@@ -80,7 +80,6 @@ trtmntDic = {
 "ns3::AdrFuzzyMB":"FADR-M"
 "ns3::AdrFuzzyRep":"FL-ADR"
 '''
-
 
 dfMetricas      = {metric: pd.DataFrame() for metric in metricasDic.keys()}
 dfPLR           = {metric: pd.DataFrame() for metric in PLRDic.keys()} 
@@ -131,17 +130,15 @@ devStatus      = outputPath + 'deviceStatus-'
 def executarSim(): 
     rodCont = 1   
     numTotRod = 0 
-
     tempoAcum = 0
     cmd = ""    
     apagarArqs(outputPath)
     reiniciarEstruturas()
     reiniciarEstruturasST() 
     inicializarDictTempo()
-
     #print(f"dimDic = \n{dimDic}")       
     #print(f"dimIdDic = \n{dimIdDic}")       
-    
+        
     print(f"Cenário selecionado: {cenarioLgdDic[tipoCenario]}.")   
     for mob in mobDic.keys(): 
         for gw in gwDic.keys():
@@ -168,6 +165,7 @@ def executarSim():
                         atualizarDadosSfFinal(mob, gw, dim1, dim2, rep)
                         atualizarDictTempo(dim1, dim2, tempoExec)
                 reiniciarEstruturasST()
+                #plotarSFFinalporED(mob, gw, esq) if ((not mobility) and (not grafSuperf) and dimIdDic['dim']=='numED') else None                                
                 print(obterRelatorio(cmd))                
             salvarDadosMetricasArq(mob, gw)
             salvarDadosPLRArq(mob, gw)
@@ -290,9 +288,8 @@ def atualizarDadosST (mob, gw, dim1, dim2, rep):
         celulaPDR.append(amostrasPDR_ST[0][i])   
         dfPDR_ST.at[i,dim2] = celulaPDR   
     amostrasPDR_ST.clear()
-    
-    #print(f"dim2={dim2}, trtDic = \n{list(trtmntDic[dimIdDic['dim2']].keys())[-1]}")
-    if (rep == numRep-1) and (dim2 == dimDic['dim2'][-1]):    
+        
+    if (rep == numRep-1) and (dim2 == list(dimDic['dim2'])[-1]):
         dfPDR_ST.to_json(f"{outputPath}ST-{dimIdDic['dim1']}-{dim1}-MbltProb{mob}-{gw}Gw.json", orient='records')
 
 def atualizarDadosSfFinal(mob, gw, dim1, dim2, rep):
@@ -366,8 +363,8 @@ def ajustarLstCenarios(parser):
     if (grafSuperf):        
         dimIdDic['dim1'] = 'numED'
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
-        dimIdDic['dim2'] = 'sideLength'
-        dimDic['dim2'] = sideLengthLst if (tipoExecucao == 0) else sideLengthLst[-2:]
+        dimIdDic['dim2'] = 'pktsPerDay'
+        dimDic['dim2'] = pktsPerDayLst if (tipoExecucao == 0) else pktsPerDayLst[-2:]
 
         
 
@@ -396,7 +393,7 @@ def ajustarComandoSim(mob, gw, dim1, dim2 ):
     
     if (grafSuperf):
         numED = dim1
-        sideLength = dim2
+        pktsPerDay = dim2
         adrType = adrTypeDef
 
     
@@ -674,107 +671,19 @@ def plotarSFFinalPorc(mob, gw):
         plt.savefig(f"{outputPath}{dimIdDic['dim1']}-{dim1}-SFFinal{dim2}-MbltProb{mob}-{gw}Gw.png")
         plt.close()
 
-def plotarSuperficie(mob, gw):
 
-    if (not novaSim):
-        carregarDadosMetricasArq(mob, gw)
-
-    # Obtem um gráfico para cada métrica
-    for metK, metV in metricasDic.items():
-        if (metK == 'CPSR' and not modoConfirm):
-            continue
-
-        eixoX = dfMetricas[metK].iloc[:, 0]   
-        eixoY = dfMetricas[metK].iloc[:, 1:]   # Removendo o primeiro elemento de cada Series (que corresponde ao rótulo da coluna)
-        #dfMedia = dados.map(lambda lista: np.mean(lista))
-        #dfDP = dados.map(lambda lista: np.std(lista, ddof=1))           
-        #z = norm.ppf(areaIC)
-
-        '''plt.subplots(figsize=(7, 6))  # Definindo o tamanho do gráfico
-            
-        marc = marcadores
-        if not exibirMarc:
-            marc = [' ']
-
-        for i, coluna in enumerate(dfMedia.columns):
-            eixo_y = dfMedia[coluna]
-            desvio = dfDP[coluna]            
-            erro_padrao = desvio / np.sqrt(numRep) * z  # Calcula o erro padrão 
-            cor = corLinhas[i % len(corLinhas)]            
-            lbl = trtmntDic[dimIdDic['dim2']][coluna]   # Obtem a respectiva legenda a partir da chave em dimIdDic['dim2']            
-            
-            plt.errorbar(eixo_x, eixo_y, yerr=erro_padrao, fmt='o', capsize=12, capthick=3, lw=4, color=cor, markersize=2) if barraErro else None
-            plt.plot(eixo_x, eixo_y, linestyle=estilos[i % len(estilos)], marker=marc[i % len(marc)], ms=10, lw=2.8, label=lbl, color=cor, markeredgecolor=corPreenc, mew=1.2)  # Adiciona uma linha para cada coluna
-        
-'''
-
-        #print(f'dados função = {dados}\n')
-        # Extrair os valores dos eixos X (número de dispositivos) e Y (pacotes por dia) do DataFrame
-        #eixoX = dados['GrafSuperf'].values  # Eixo X
-        #eixoY = dados.columns[1:].astype(int)  # Eixo Y (colunas 1 a 4, exceto a coluna 'GrafSuperf')
-
-        # Calcular a média dos valores de PDR em cada célula, lidando com None ou valores não numéricos
-        valores = dfMetricas[metK].iloc[:, 1:].applymap(lambda x: np.mean(x) if isinstance(x, list) else np.nan).values
-       
-
-        # Criar grid para interpolar os valores e suavizar a superfície
-        X, Y = np.meshgrid(eixoX, eixoY)
-        Z = valores.T  # Transpor para alinhar corretamente os dados
-
-        # Gerar uma grade mais densa para suavizar a superfície
-        X_dense, Y_dense = np.meshgrid(np.linspace(min(eixoX), max(eixoX), 100),
-                                    np.linspace(min(eixoY), max(eixoY), 100))
-        Z_dense = griddata((X.flatten(), Y.flatten()), Z.flatten(), (X_dense, Y_dense), method='cubic')
-
-        # Criar a figura 3D
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection='3d')
-
-        # Plotar a superfície com colormap invertido (azul para maiores, vermelho para menores)
-        surf = ax.plot_surface(X_dense, Y_dense, Z_dense, cmap='coolwarm_r', edgecolor='none')
-
-        # Adicionar barra de cor (color bar)
-        #fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='PDR')
-        cbar = fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, pad=0.15)
-        cbar.ax.tick_params(labelsize=tamFonteGraf-4) 
-
-        # Desenhar linhas de contorno manualmente
-        ax.plot_wireframe(X_dense, Y_dense, Z_dense, color='gray', linewidth=0.5)  # Ajuste a espessura aqui
-
-        # Definir os rótulos dos eixos com tamanho de fonte maior e maior distância (labelpad)
-        ax.set_xlabel(trtmntLblDic[dimIdDic['dim1']], fontsize=tamFonteGraf-3, fontname=nomeFonte, labelpad=20)
-        ax.set_ylabel(trtmntLblDic[dimIdDic['dim2']], fontsize=tamFonteGraf-3, fontname=nomeFonte, labelpad=20)
-        ax.set_zlabel(metricasDic[metK], fontsize=tamFonteGraf-3, fontname=nomeFonte,  labelpad=25)
-
-        # Aumentar o tamanho da fonte dos valores dos eixos (ticks)
-        ax.tick_params(axis='x', labelsize=tamFonteGraf-4, labelfontfamily=nomeFonte)
-        ax.tick_params(axis='y', labelsize=tamFonteGraf-4, labelfontfamily=nomeFonte)
-        ax.tick_params(axis='z', labelsize=tamFonteGraf-4, labelfontfamily=nomeFonte)
-
-        ax.zaxis.set_tick_params(pad=10)
-
-        # Limitar os valores dos eixos X e Y aos seus valores máximo e mínimo
-        ax.set_xlim(min(eixoX), max(eixoX))
-        ax.set_ylim(min(eixoY), max(eixoY))
-
-        # Salvar o gráfico
-        #plt.savefig(f"{outputPath}{lstCenarios[cenarioAtual]}-GrafSuperf-{met}-{esq}-MbltProb{mob}-{gw}Gw.png")
-        plt.savefig(f"{outputPath}3D-Cen{tipoCenario}-{dimIdDic['dim1']}-{metK}-{adrTypeDef}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
-        plt.close()
-
-
-'''
 def plotarSFFinalporED(mob, gw, esq):
-    arquivo = outputPath + 'deviceStatus-' + esq + '.csv'
+    #arquivo = outputPath + 'deviceStatus-' + esq + '.csv'
     # Ler o arquivo CSV
-    arq = pd.read_csv(arquivo, header=None, sep=' ')
-
-    
+    #arq = pd.read_csv(arquivo, header=None, sep=' ')
+    arquivoDS = devStatus + adrType + '.csv'
+    SFdf = pd.read_csv(arquivoDS, header=None, sep=' ')
+        
     #numNodes = ensaios[-1] if (cenarioAtual == 0 or cenarioAtual == 1) else numED
     # Extrai as colunas 2 (coordenada x), 3 (coordenada y) e 4 (valor de DR) das últimas numNodes linhas do arquivo
-    coordX         = arq.iloc[-numEDList[-1]:, 2]
-    coordY         = arq.iloc[-numEDList[-1]:, 3]
-    valoresSF = 12 - arq.iloc[-numEDList[-1]:, 4]
+    coordX         = SFdf.iloc[-numEDList[-1]:, 2]
+    coordY         = SFdf.iloc[-numEDList[-1]:, 3]
+    valoresSF = 12 - SFdf.iloc[-numEDList[-1]:, 4]
 
     # Cria um novo DataFrame com as colunas atualizadas
     EDdf = pd.DataFrame({'X': coordX, 'Y': coordY, 'SF': valoresSF})
@@ -818,7 +727,78 @@ def plotarSFFinalporED(mob, gw, esq):
     #plt.axis('equal')  # Mantém a proporção dos eixos iguais
     plt.savefig(f"{outputPath}{lstCenarios[cenarioAtual]}-SF-FinalAssign-{esq}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
     plt.close()
-'''
+
+def plotarSuperficie(mob, gw):
+
+    if (not novaSim):
+        carregarDadosMetricasArq(mob, gw)
+
+    # Obtem um gráfico para cada métrica
+    for metK, metV in metricasDic.items():
+        if (metK == 'CPSR' and not modoConfirm):
+            continue
+
+        eixoX = dimDic['dim1']
+        eixoY = dimDic['dim2']
+
+        # Calcular a média dos valores de PDR em cada célula, lidando com None ou valores não numéricos
+        #valores = dfMetricas[metK].iloc[:, 1:].applymap(lambda x: np.mean(x) if isinstance(x, list) else np.nan).values
+        valores = dfMetricas[metK].iloc[:, 1:].map(lambda x: np.mean(x) if isinstance(x, list) else np.nan).values
+
+        print(f"eixoX = \n{eixoX}")
+        print(f"eixoY = \n{eixoY}")
+        print(f"valores = \n{valores}")
+
+        # Criar grid para interpolar os valores e suavizar a superfície
+        X, Y = np.meshgrid(eixoX, eixoY)
+        Z = valores.T  # Transpor para alinhar corretamente os dados
+
+        # Gerar uma grade mais densa para suavizar a superfície
+        X_dense, Y_dense = np.meshgrid(np.linspace(min(eixoX), max(eixoX), 100),
+                                    np.linspace(min(eixoY), max(eixoY), 100))
+        Z_dense = griddata((X.flatten(), Y.flatten()), Z.flatten(), (X_dense, Y_dense), method='cubic')
+        
+        # Criar a figura 3D
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        fig.subplots_adjust(bottom=0.3, top=0.95)
+
+        # Plotar a superfície com colormap invertido (azul para maiores, vermelho para menores)
+        surf = ax.plot_surface(X_dense, Y_dense, Z_dense, cmap='coolwarm_r', edgecolor='none')
+
+        # Adicionar barra de cor (color bar)
+        #fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='PDR')
+        cbar = fig.colorbar(surf, ax=ax, shrink=0.5, aspect=10, pad=0.15)
+        cbar.ax.tick_params(labelsize=tamFonteGraf-6, labelcolor='black')
+        for label in cbar.ax.get_yticklabels():
+            label.set_fontname(nomeFonte)
+
+        # Desenhar linhas de contorno manualmente
+        ax.plot_wireframe(X_dense, Y_dense, Z_dense, color='gray', linewidth=0.5)  # Ajuste a espessura aqui
+
+        # Definir os rótulos dos eixos com tamanho de fonte maior e maior distância (labelpad)
+        ax.set_xlabel(trtmntLblDic[dimIdDic['dim1']], fontsize=tamFonteGraf-4, fontname=nomeFonte, labelpad=10)
+        ax.set_ylabel(trtmntLblDic[dimIdDic['dim2']], fontsize=tamFonteGraf-4, fontname=nomeFonte, labelpad=10)
+        ax.set_zlabel(metricasDic[metK], fontsize=tamFonteGraf-4, fontname=nomeFonte,  labelpad=20)
+
+        # Aumentar o tamanho da fonte dos valores dos eixos (ticks)
+        ax.tick_params(axis='x', labelsize=tamFonteGraf-4, labelfontfamily=nomeFonte)
+        ax.tick_params(axis='y', labelsize=tamFonteGraf-4, labelfontfamily=nomeFonte)
+        ax.tick_params(axis='z', labelsize=tamFonteGraf-4, labelfontfamily=nomeFonte)
+
+        # Definir ticks máximos para os eixos X e Y
+        ax.xaxis.set_major_locator(MaxNLocator(nbins=5))  # Limitar o eixo X a 5 ticks
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=5))  # Limitar o eixo Y a 5 ticks
+        ax.zaxis.set_tick_params(pad=10)
+
+        # Limitar os valores dos eixos X e Y aos seus valores máximo e mínimo
+        ax.set_xlim(min(eixoX), max(eixoX))
+        ax.set_ylim(min(eixoY), max(eixoY))
+        
+        plt.savefig(f"{outputPath}3D-Cen{tipoCenario}-{dimIdDic['dim1']}-{metK}-{adrTypeDef}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
+        plt.close()
+
     
 ##### ARQUIVOS ######
 # Função para salvar um DF em um arquivo JSON
@@ -909,8 +889,8 @@ def obterRelatorio(relFinal=False):
                 resultadoPerc = resultadoPerc.astype(str) + '%'
                 saida += f"\nDiferença de {metK} entre {dfMedia.columns[0]} e {dfMedia.columns[i]}:\n{round(resultado,7)}\n"
                 saida += f"\nDiferença perc.  de {metK} entre {dfMedia.columns[0]} e {dfMedia.columns[i]}:\n{round(resultadoPerc,7)} \n"
-                saida += f"===> Diferença média: {round(resultado.mean(),7)} \n"                                
-                saida += f"===> Diferença média perc.: {round(meanResPer,7)}% \n" 
+                saida += f"===> Diferença média: {round(resultado.mean(),7)} \n"
+                saida += f"===> Diferença média perc.: {round(meanResPer,7)}% \n"
     saida += ":::::::::::::::::::::::::::::::::::::::::::::::::::::\n"
     
     return saida
@@ -962,7 +942,7 @@ def main():
                     plotarSFFinalPorc(mob, gw)
                 else:
                     plotarSuperficie(mob, gw)
-                    gerarRelatorioFinal(mob, gw, "")            
+                gerarRelatorioFinal(mob, gw, "")            
 
 if __name__ == '__main__':
     main()
