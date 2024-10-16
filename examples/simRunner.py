@@ -7,6 +7,7 @@ import time
 from matplotlib import ticker
 from matplotlib.font_manager import FontProperties
 from scipy.stats import norm
+from scipy.interpolate import griddata
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,16 +23,16 @@ import matplotlib.pyplot as plt
 tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida (Teste)
 tipoCenario      = 0      # Default
 novaSim          = True   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
-backupOutputDir  = True   # Realiza um backup local dos resultados
+backupOutputDir  = False   # Realiza um backup local dos resultados
 
 
 # -= Parâmetros de Simulação =-
-numRep          = 10 if (tipoExecucao == 0) else 3
+numRep          = 10 if (tipoExecucao == 0) else 2
 sideLength      = 10000
 areaCirc        = False
 numPeriods      = 1   #  1.125: whether consider warming time
 #simTime         = numPeriods * 24*60*60     # Não usar tempo menor que 2h (7200s)
-simTime         = 43200 # 7200 9600 14400 28800 43200
+simTime         = 7200 # 7200 9600 14400 28800 43200
 pktSize         = 30                      # 0 para usar valor default do módulo
 pktsPerDay      = 144
 appPeriod       = 86400/pktsPerDay
@@ -66,7 +67,7 @@ trtmntDic = {
     'adrType'        : {"ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"},    
     'mobModel'       : {'0': "Random Walk", '1': "Random Waypoint", '2':"Gauss Markov"},
     'speedClass'     : {'0': "Speed Class 0", '1': "Speed Class 1", '2':"Speed Class 0"},
-    'okumuraEnvrmnt' : {'0': "UrbanEnvironment", '1': "SubUrbanEnvironment", '2': "OpenAreasEnvironment"}
+    'okumuraEnvrmnt' : {'0': "UrbanEnvironment", '1': "SubUrbanEnvironment", '2': "OpenAreasEnvironment"}    
 }  # A variável registrada em dim2 precisa ter uma entrada nesse dicionário
 
 '''Esquemas ADR disponíveis: 
@@ -115,6 +116,7 @@ SFFinalED       = True         # Se plotar ou não gráficos com as atribuiçõe
 energiaPorED    = True         # Se exibir o consumo médio por ED ou global na métrica EneCon
 efEnergEmKbits  = False         # Se exibir a medida de eficEnerg em Kbits/J ou bits/J
 multGWPar       = True          # MGP - modo MultGwPar para gerar gráficos pareados
+grafSuperf      = False         # Se plotar ou não gráfico de superfície (3D). Caso 'true', desabilita os gráficos 2D
 
 # -= Arquivos =-
 outputFile     = ""
@@ -166,14 +168,16 @@ def executarSim():
                         atualizarDadosSfFinal(mob, gw, dim1, dim2, rep)
                         atualizarDictTempo(dim1, dim2, tempoExec)
                 reiniciarEstruturasST()
-                print(obterRelatorio(cmd))
+                print(obterRelatorio(cmd))                
             salvarDadosMetricasArq(mob, gw)
             salvarDadosPLRArq(mob, gw)
-            plotarGraficos(mob, gw)
-            plotarGraficosPLR(mob, gw)
-            protarGraficoST(mob, gw)
-            plotarSFFinalPorc(mob, gw)
-            #print(f"dfMetricas = \n{dfMetricas}")
+            if (not grafSuperf):
+                plotarGraficos(mob, gw)
+                plotarGraficosPLR(mob, gw)
+                protarGraficoST(mob, gw)
+                plotarSFFinalPorc(mob, gw)
+            else:
+                plotarSuperficie(mob, gw)  # TO DO            
             gerarRelatorioFinal(mob, gw, cmd)
             reiniciarEstruturas()
 
@@ -358,6 +362,13 @@ def ajustarLstCenarios(parser):
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
         dimIdDic['dim2'] = 'speedClass'
         dimDic['dim2'] = trtmntDic['speedClass'].keys() if (tipoExecucao == 0) else list(trtmntDic['speedClass'].keys())[:2]
+
+    if (grafSuperf):        
+        dimIdDic['dim1'] = 'numED'
+        dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
+        dimIdDic['dim2'] = 'sideLength'
+        dimDic['dim2'] = sideLengthLst if (tipoExecucao == 0) else sideLengthLst[-2:]
+
         
 
 
@@ -382,6 +393,12 @@ def ajustarComandoSim(mob, gw, dim1, dim2 ):
         minSpeed = minSpeedLst[int(dim2)]
         maxSpeed = maxSpeedLst[int(dim2)]
         adrType = adrTypeDef
+    
+    if (grafSuperf):
+        numED = dim1
+        sideLength = dim2
+        adrType = adrTypeDef
+
     
     base_params = {
         '--nGw': str(gw),
@@ -656,6 +673,152 @@ def plotarSFFinalPorc(mob, gw):
         plt.tight_layout()
         plt.savefig(f"{outputPath}{dimIdDic['dim1']}-{dim1}-SFFinal{dim2}-MbltProb{mob}-{gw}Gw.png")
         plt.close()
+
+def plotarSuperficie(mob, gw):
+
+    if (not novaSim):
+        carregarDadosMetricasArq(mob, gw)
+
+    # Obtem um gráfico para cada métrica
+    for metK, metV in metricasDic.items():
+        if (metK == 'CPSR' and not modoConfirm):
+            continue
+
+        eixoX = dfMetricas[metK].iloc[:, 0]   
+        eixoY = dfMetricas[metK].iloc[:, 1:]   # Removendo o primeiro elemento de cada Series (que corresponde ao rótulo da coluna)
+        #dfMedia = dados.map(lambda lista: np.mean(lista))
+        #dfDP = dados.map(lambda lista: np.std(lista, ddof=1))           
+        #z = norm.ppf(areaIC)
+
+        '''plt.subplots(figsize=(7, 6))  # Definindo o tamanho do gráfico
+            
+        marc = marcadores
+        if not exibirMarc:
+            marc = [' ']
+
+        for i, coluna in enumerate(dfMedia.columns):
+            eixo_y = dfMedia[coluna]
+            desvio = dfDP[coluna]            
+            erro_padrao = desvio / np.sqrt(numRep) * z  # Calcula o erro padrão 
+            cor = corLinhas[i % len(corLinhas)]            
+            lbl = trtmntDic[dimIdDic['dim2']][coluna]   # Obtem a respectiva legenda a partir da chave em dimIdDic['dim2']            
+            
+            plt.errorbar(eixo_x, eixo_y, yerr=erro_padrao, fmt='o', capsize=12, capthick=3, lw=4, color=cor, markersize=2) if barraErro else None
+            plt.plot(eixo_x, eixo_y, linestyle=estilos[i % len(estilos)], marker=marc[i % len(marc)], ms=10, lw=2.8, label=lbl, color=cor, markeredgecolor=corPreenc, mew=1.2)  # Adiciona uma linha para cada coluna
+        
+'''
+
+        #print(f'dados função = {dados}\n')
+        # Extrair os valores dos eixos X (número de dispositivos) e Y (pacotes por dia) do DataFrame
+        #eixoX = dados['GrafSuperf'].values  # Eixo X
+        #eixoY = dados.columns[1:].astype(int)  # Eixo Y (colunas 1 a 4, exceto a coluna 'GrafSuperf')
+
+        # Calcular a média dos valores de PDR em cada célula, lidando com None ou valores não numéricos
+        valores = dfMetricas[metK].iloc[:, 1:].applymap(lambda x: np.mean(x) if isinstance(x, list) else np.nan).values
+       
+
+        # Criar grid para interpolar os valores e suavizar a superfície
+        X, Y = np.meshgrid(eixoX, eixoY)
+        Z = valores.T  # Transpor para alinhar corretamente os dados
+
+        # Gerar uma grade mais densa para suavizar a superfície
+        X_dense, Y_dense = np.meshgrid(np.linspace(min(eixoX), max(eixoX), 100),
+                                    np.linspace(min(eixoY), max(eixoY), 100))
+        Z_dense = griddata((X.flatten(), Y.flatten()), Z.flatten(), (X_dense, Y_dense), method='cubic')
+
+        # Criar a figura 3D
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Plotar a superfície com colormap invertido (azul para maiores, vermelho para menores)
+        surf = ax.plot_surface(X_dense, Y_dense, Z_dense, cmap='coolwarm_r', edgecolor='none')
+
+        # Adicionar barra de cor (color bar)
+        #fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='PDR')
+        cbar = fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, pad=0.15)
+        cbar.ax.tick_params(labelsize=tamFonteGraf-4) 
+
+        # Desenhar linhas de contorno manualmente
+        ax.plot_wireframe(X_dense, Y_dense, Z_dense, color='gray', linewidth=0.5)  # Ajuste a espessura aqui
+
+        # Definir os rótulos dos eixos com tamanho de fonte maior e maior distância (labelpad)
+        ax.set_xlabel(trtmntLblDic[dimIdDic['dim1']], fontsize=tamFonteGraf-3, fontname=nomeFonte, labelpad=20)
+        ax.set_ylabel(trtmntLblDic[dimIdDic['dim2']], fontsize=tamFonteGraf-3, fontname=nomeFonte, labelpad=20)
+        ax.set_zlabel(metricasDic[metK], fontsize=tamFonteGraf-3, fontname=nomeFonte,  labelpad=25)
+
+        # Aumentar o tamanho da fonte dos valores dos eixos (ticks)
+        ax.tick_params(axis='x', labelsize=tamFonteGraf-4, labelfontfamily=nomeFonte)
+        ax.tick_params(axis='y', labelsize=tamFonteGraf-4, labelfontfamily=nomeFonte)
+        ax.tick_params(axis='z', labelsize=tamFonteGraf-4, labelfontfamily=nomeFonte)
+
+        ax.zaxis.set_tick_params(pad=10)
+
+        # Limitar os valores dos eixos X e Y aos seus valores máximo e mínimo
+        ax.set_xlim(min(eixoX), max(eixoX))
+        ax.set_ylim(min(eixoY), max(eixoY))
+
+        # Salvar o gráfico
+        #plt.savefig(f"{outputPath}{lstCenarios[cenarioAtual]}-GrafSuperf-{met}-{esq}-MbltProb{mob}-{gw}Gw.png")
+        plt.savefig(f"{outputPath}3D-Cen{tipoCenario}-{dimIdDic['dim1']}-{metK}-{adrTypeDef}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
+        plt.close()
+
+
+'''
+def plotarSFFinalporED(mob, gw, esq):
+    arquivo = outputPath + 'deviceStatus-' + esq + '.csv'
+    # Ler o arquivo CSV
+    arq = pd.read_csv(arquivo, header=None, sep=' ')
+
+    
+    #numNodes = ensaios[-1] if (cenarioAtual == 0 or cenarioAtual == 1) else numED
+    # Extrai as colunas 2 (coordenada x), 3 (coordenada y) e 4 (valor de DR) das últimas numNodes linhas do arquivo
+    coordX         = arq.iloc[-numEDList[-1]:, 2]
+    coordY         = arq.iloc[-numEDList[-1]:, 3]
+    valoresSF = 12 - arq.iloc[-numEDList[-1]:, 4]
+
+    # Cria um novo DataFrame com as colunas atualizadas
+    EDdf = pd.DataFrame({'X': coordX, 'Y': coordY, 'SF': valoresSF})
+
+    # Define as cores com base nos valores de SF
+    coresSF = {
+        12: 'red',
+        11: 'darkviolet',
+        10: 'blue',
+        9: 'green',
+        8: 'gold',
+        7: 'gray'
+    }
+
+    # Cria o gráfico
+    plt.figure(figsize=(8, 6))
+
+    # Plota o gateway em formato de estrela no centro
+    if (not multiGw):
+        plt.plot(0, 0, marker='*', color='gold', markersize=15, label='Gateway')
+
+    tol = 500
+    plt.xlim(-sideLength / 2 - tol, sideLength / 2 + tol)
+    plt.ylim(-sideLength / 2 - tol, sideLength / 2 + tol)
+
+    # Plota os nós da rede com destaque em suas circunferências
+    for index, row in EDdf.iterrows():
+        plt.scatter(row['X'], row['Y'], s=200, color=coresSF[row['SF']], edgecolor='black', linewidth=0.5)
+        
+    # Adiciona legendas
+    legend_elements = [Patch(color=color, label=f'SF{sf}') for sf, color in coresSF.items()]
+    plt.legend(handles=legend_elements, title='SF values', fontsize=tamFonteGraf-8, bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.title('SF Final Assignment by ED')
+    plt.xlabel('X-position (m)', fontsize=tamFonteGraf-8)
+    plt.ylabel('Y-position (m)', fontsize=tamFonteGraf-8)
+    plt.xticks(fontsize=tamFonteGraf-8)
+    plt.yticks(fontsize=tamFonteGraf-8)
+
+    plt.tight_layout()  # Ajusta o layout para evitar sobreposição    
+    #plt.axis('equal')  # Mantém a proporção dos eixos iguais
+    plt.savefig(f"{outputPath}{lstCenarios[cenarioAtual]}-SF-FinalAssign-{esq}-MbltProb{mob}-{gw}Gw.png", bbox_inches='tight')
+    plt.close()
+'''
     
 ##### ARQUIVOS ######
 # Função para salvar um DF em um arquivo JSON
@@ -791,13 +954,15 @@ def main():
         print("Replotando gráficos...")
         reiniciarEstruturas() 
         for mob in mobDic.keys(): 
-            for gw in gwDic.keys():
-                plotarGraficos(mob, gw)
-                plotarGraficosPLR(mob, gw)
-                protarGraficoST(mob, gw)
-                plotarSFFinalPorc(mob, gw)
-                gerarRelatorioFinal(mob, gw, "")
-            
+            for gw in gwDic.keys():                
+                if (not grafSuperf):
+                    plotarGraficos(mob, gw)
+                    plotarGraficosPLR(mob, gw)
+                    protarGraficoST(mob, gw)
+                    plotarSFFinalPorc(mob, gw)
+                else:
+                    plotarSuperficie(mob, gw)
+                    gerarRelatorioFinal(mob, gw, "")            
 
 if __name__ == '__main__':
     main()
