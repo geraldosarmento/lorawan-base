@@ -15,6 +15,9 @@ import matplotlib.pyplot as plt
 # Sample generated command: time ./ns3 run "littoral --adrType=ns3::AdrMB --simTime=86400" --quiet
 # 'Tipos de cenário: {0:'numED', 1:'sideLength', 2:'pktsPerDay', 3:'modMob', 4:'speedClass'}
 
+# TO DO:
+# - Incluir grafico de superficie -> requer dim3
+
 # -= Controle Geral =- 
 tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida (Teste)
 tipoCenario      = 0      # Default
