@@ -24,18 +24,16 @@ import time
 
 # -= Controle Geral =- 
 tipoExecucao     = 0      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida (Teste)
-tipoCenario      = 0      # Default
 novaSim          = True   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
 backupOutputDir  = True   # Realiza um backup local dos resultados
-
 
 # -= Parâmetros de Simulação =-
 numRep          = 10 if (tipoExecucao == 0) else 3
 sideLength      = 10000
 areaCirc        = False
 numPeriods      = 1   #  1.125: whether consider warming time
-simTime         = numPeriods * 24*60*60     # Não usar tempo menor que 2h (7200s)
-#simTime         = 7200 # 7200 9600 14400 28800 43200
+# Tempos de teste: 7200 9600 14400 28800 43200. # Não usar tempo menor que 2h (7200s) !!
+simTime         = numPeriods * 24*60*60 if (tipoExecucao == 0) else 7200   
 pktSize         = 30                      # 0 para usar valor default do módulo
 pktsPerDay      = 144
 appPeriod       = 86400/pktsPerDay
@@ -47,8 +45,10 @@ areaIC          = 0.975  # área gaussina para um intervalo de confiança bilate
 okumura         = False
 okumuraEnvrmnt  = 0      # 0: UrbanEnvironment, 1: SubUrbanEnvironment, 2: OpenAreasEnvironment. Só tem efeito quando 'okumura = "true" '
 modoConfirm     = False   # Caso True, ativa-se o modo confirmado e utiliza-se a métrica CPSR
-multiGw         = False
 mobility        = True
+multiGw         = True
+numTratMG       = 3       # Quantos tratamentos usar em dim2 em um cenário multiGw. Recomendado usar entre 2 e 4 (para não explodir o número de simulações)
+
 
 # -= Listas, Dicionários e Estruturas de Dados =-
 numEDLst        = [200, 400, 600, 800, 1000]
@@ -67,7 +67,7 @@ trtmntLblDic    = {'numED':'Number of End Devices',  'adrType':'ADR Scheme', 'si
 trtmntDic = {
     'adrType'        : {"ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"},    
     'mobModel'       : {'0': "Random Walk", '1': "Random Waypoint", '2':"Gauss Markov"},
-    'speedClass'     : {'0': "Speed Class 0", '1': "Speed Class 1", '2':"Speed Class 0"},
+    'speedClass'     : {'0': "Speed Class 0", '1': "Speed Class 1", '2':"Speed Class 2"},
     'okumuraEnvrmnt' : {'0': "UrbanEnvironment", '1': "SubUrbanEnvironment", '2': "OpenAreasEnvironment"}    
 }  # A variável registrada em dim2 precisa ter uma entrada nesse dicionário
 
@@ -95,7 +95,8 @@ adrTypeDef      = list(trtmntDic['adrType'].keys())[0]  # Esquema ADR default: o
 numED           = int(numEDLst[-1]/2)
 tempoLst        = list(range(1, int(simTime/3600) + 1))  # lista contendo as horas de simulação para ST
 gwDic           = {1:"1 Gateway"} if (not multiGw) else  {1:"1 Gateway", 2:"2 Gateways"}
-contagemSF      = {7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0} 
+contagemSF      = {7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0}
+tipoCenario     = 0      # Default
 
 # Controle dos Gráficos
 tamFonteGraf    = 20
@@ -332,26 +333,31 @@ def ajustarLstCenarios(parser):
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
         dimIdDic['dim2'] = 'adrType'
         dimDic['dim2'] = trtmntDic['adrType'].keys() if (tipoExecucao == 0) else list(trtmntDic['adrType'].keys())[:2]
+        dimDic['dim2'] = list(trtmntDic['adrType'].keys())[:numTratMG] if (multiGw) else None
     elif (tipoCenario == 1):
         dimIdDic['dim1'] = 'sideLength'
         dimDic['dim1'] = sideLengthLst if (tipoExecucao == 0) else sideLengthLst[-2:]
         dimIdDic['dim2'] = 'adrType'
         dimDic['dim2'] = trtmntDic['adrType'].keys() if (tipoExecucao == 0) else list(trtmntDic['adrType'].keys())[:2]
+        dimDic['dim2'] = list(trtmntDic['adrType'].keys())[:numTratMG] if (multiGw) else None
     elif (tipoCenario == 2):
         dimIdDic['dim1'] = 'pktsPerDay'
         dimDic['dim1'] = pktsPerDayLst if (tipoExecucao == 0) else pktsPerDayLst[-2:]
         dimIdDic['dim2'] = 'adrType'
         dimDic['dim2'] = trtmntDic['adrType'].keys() if (tipoExecucao == 0) else list(trtmntDic['adrType'].keys())[:2]
+        dimDic['dim2'] = list(trtmntDic['adrType'].keys())[:numTratMG] if (multiGw) else None
     elif (tipoCenario == 3):
         dimIdDic['dim1'] = 'numED'
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
         dimIdDic['dim2'] = 'mobModel'
         dimDic['dim2'] = trtmntDic['mobModel'].keys() if (tipoExecucao == 0) else list(trtmntDic['mobModel'].keys())[:2]
+        dimDic['dim2'] = list(trtmntDic['mobModel'].keys())[:numTratMG] if (multiGw) else None
     elif (tipoCenario == 4):
         dimIdDic['dim1'] = 'numED'
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
         dimIdDic['dim2'] = 'speedClass'
         dimDic['dim2'] = trtmntDic['speedClass'].keys() if (tipoExecucao == 0) else list(trtmntDic['speedClass'].keys())[:2]
+        dimDic['dim2'] = list(trtmntDic['speedClass'].keys())[:numTratMG] if (multiGw) else None
 
     if (grafSuperf):        
         dimIdDic['dim1'] = 'numED'
@@ -877,6 +883,8 @@ def obterRelatorio(relFinal=False):
                 resultadoPerc = (dfMedia.iloc[:, 0] - dfMedia.iloc[:, i])/dfMedia.iloc[:, i] * 100                
                 meanResPer    = resultadoPerc.mean()
                 resultadoPerc = resultadoPerc.astype(str) + '%'
+                resultado = resultado.astype(float)
+                resultadoPerc = resultadoPerc.str.rstrip('%').astype(float)                
                 saida += f"\nDiferença de {metK} entre {dfMedia.columns[0]} e {dfMedia.columns[i]}:\n{round(resultado,7)}\n"
                 saida += f"\nDiferença perc.  de {metK} entre {dfMedia.columns[0]} e {dfMedia.columns[i]}:\n{round(resultadoPerc,7)} \n"
                 saida += f"===> Diferença média: {round(resultado.mean(),7)} \n"
