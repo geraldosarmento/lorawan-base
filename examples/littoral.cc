@@ -52,14 +52,15 @@ NS_LOG_COMPONENT_DEFINE("LittoralSim");
 
 
 //-- Simulation Parameters --//
-int nDevices = 200;
+int nDevices = 1;
 int nGateways = 1;
 int nPeriods = 1;
-double simulationTime = (24*60*60 * nPeriods);
+//double simulationTime = (24*60*60 * nPeriods);
+double simulationTime = 3600;
 double pktsPerDay = 144;    // e.g.: 144 pkts/day is equivalent to 1 pkt/600s
 double appPeriodSecs = 600; 
 int packetSize = 30;  
-double sideLength = 10000.0;   // If the region is circular, sideLength will represent the diameter of the area, so sideLength = 2*radius
+double sideLength = 100.0;   // If the region is circular, sideLength will represent the diameter of the area, so sideLength = 2*radius
 double edHeight = 1.5;
 double gwHeight = 15.0;
 int baseSeedSetRun = 0;
@@ -81,15 +82,14 @@ bool const saveToFile = true;
 
 //-- Mobility Parameters --// 
 enum mobilityModel {
-    ConstantPosition            = 0,
-    RandomWalk                  = 1,
-    SteadyStateRandomWaypoint   = 2,
-    GaussMarkov                 = 3
+    RandomWalk                 = 0,
+    SteadyStateRandomWaypoint  = 1,
+    GaussMarkov                = 2
 };
 
 double mobileNodeProbability = 1.0;
-double minSpeed = 0.5;
-double maxSpeed = 1.5;
+double minSpeed = 5.0;
+double maxSpeed = 5.0;
 double maxRandomLoss = 10;
 int mobModel = RandomWalk;
 
@@ -236,10 +236,7 @@ main(int argc, char* argv[])
     else {
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
         RngSeedManager::SetSeed(seed);
-    }
-
-    if (mobModel == ConstantPosition)
-        mobileNodeProbability = 0;
+    }    
     
     std::string adrTypeFile = adrType;   // ADR scheme that should be part of the output file name
 
@@ -450,17 +447,16 @@ main(int argc, char* argv[])
         Vector position = mobility->GetPosition ();
         position.z = edHeight;
         mobility->SetPosition (position);
-        //std::cout << "Nó estático : " << endDevices.Get(i)->GetId() << std::endl;
     }
-
     // Install mobility model on mobile nodes
+
     if (mobModel == RandomWalk) {
         mobilityEd.SetMobilityModel(
         "ns3::RandomWalk2dMobilityModel",
         "Bounds",        
         RectangleValue(Rectangle(-sideLength/2, sideLength/2, -sideLength/2, sideLength/2)),
         "Distance",
-        DoubleValue(1000),
+        DoubleValue(100),
         "Speed",
         PointerValue(CreateObjectWithAttributes<UniformRandomVariable>("Min",
                                                                        DoubleValue(minSpeed),
@@ -492,7 +488,7 @@ main(int argc, char* argv[])
         PointerValue(CreateObjectWithAttributes<UniformRandomVariable>("Min",
                                                                        DoubleValue(0),
                                                                        "Max",
-                                                                       DoubleValue(1000))),
+                                                                       DoubleValue(100))),
         "MeanVelocity",
         PointerValue(CreateObjectWithAttributes<UniformRandomVariable>("Min",
                                                                        DoubleValue(minSpeed),
@@ -510,7 +506,7 @@ main(int argc, char* argv[])
         Vector position = mobility->GetPosition ();
         position.z = edHeight;
         mobility->SetPosition (position);        
-        //std::cout << "Nó móvel : " << endDevices.Get(i)->GetId() << std::endl;
+        //std::cout << "Mobilidade no nó : " << endDevices.Get(i)->GetId() << std::endl;
     }
     //std::cout << "Modelo de mobilidade aplicado : " << mobModel << std::endl;
     
@@ -752,7 +748,8 @@ main(int argc, char* argv[])
         phyPerf += adrTypeFile + ".csv";
         globalPerf += adrTypeFile + ".csv";
 
-        Time stateSamplePeriod = Seconds(60*60);
+        //Time stateSamplePeriod = Seconds(60*60);
+        Time stateSamplePeriod = Seconds(1);
         helper.EnablePeriodicDeviceStatusPrinting(endDevices, gateways, deviceStatus, stateSamplePeriod);
         helper.EnablePeriodicPhyPerformancePrinting(gateways, phyPerf, stateSamplePeriod);
         helper.EnablePeriodicGlobalPerformancePrinting(globalPerf, stateSamplePeriod); 
@@ -779,7 +776,7 @@ main(int argc, char* argv[])
      ****************/
 
     // Additional tolerance time for the end of the simulation
-    simulationTime += 1800; 
+    //simulationTime += 1800; 
 
     //AnimationInterface anim ("animation.xml");     
 

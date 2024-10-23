@@ -25,7 +25,7 @@ import time
 # -= Controle Geral =- 
 tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida (Teste)
 novaSim          = True   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
-backupOutputDir  = False   # Realiza um backup local dos resultados
+backupOutputDir  = True   # Realiza um backup local dos resultados
 
 # -= Parâmetros de Simulação =-
 numRep          = 10 if (tipoExecucao == 0) else 2
@@ -148,9 +148,9 @@ def executarSim():
                 for dim2 in dimDic['dim2']:                    
                     for rep in range(numRep):
                         numTotRod = len(mobDic)*len(gwDic)*len(dimDic['dim1'])*len(dimDic['dim2'])*numRep
-                        print("==================================================================================================================")
-                        print(f"   Ensaio atual: {dimIdDic['dim1']}={dim1} | {dimIdDic['dim2']}={dim2} - NumGw: {gw} - Mobilidade:{'Sim' if (float(mob)>0) else 'Não'} - Rep: {rep+1} - Rodada: {rodCont} de {numTotRod}")
-                        print("==================================================================================================================")
+                        print("=============================================================================================================")
+                        print(f"   Ensaio: {dimIdDic['dim1']}={dim1} | {dimIdDic['dim2']}={dim2} - NumGw: {gw} - Mob.:{'Sim' if (float(mob)>0) else 'Não'} - Rep: {rep+1} - Rodada: {rodCont} de {numTotRod}")
+                        print("=============================================================================================================")
                         cmd = ajustarComandoSim(mob, gw, dim1, dim2)
                         print (f"Comando submetido: {cmd}")
                         print (f"Executando simulação...")
