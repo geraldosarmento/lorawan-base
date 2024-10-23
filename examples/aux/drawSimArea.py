@@ -4,22 +4,25 @@ import numpy as np
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.patches import Rectangle, Circle
 
+# Script para plotar um gráfico com uma amostra de área de simulação
+
+
 # Variável para definir a forma da área de simulação: 'quadrado' ou 'circulo'
 shape = 'circulo'  # Opções: 'quadrado' ou 'circulo'
 
 # Definindo as dimensões do quadrado/círculo
-lado_quadrado = 8000  # em metros
+lado_quadrado = 10000  # em metros
 raio_circulo = lado_quadrado / 2
 tamFonteGraf = 26
-nomeFonte = 'Arial'  # def: "sans-serif"  #"Arial" #'Times New Roman'
+nomeFonte = 'Times New Roman'  # def: "sans-serif"  #"Arial" #'Times New Roman'
 rootPath = '.'
-towerPath = 'tower4.png'
-towerZoom = 0.1
-numGw = 2  # num de Gw = torres
-cor = 'pink'  #  'lightblue'  'pink' 'lightgray' 'moccasin'
+towerPath = 'tower2.png'
+towerZoom = 1.0
+numGw = 1  # num de Gw = torres
+cor = 'plum'  #  'lightblue'  'pink' 'lightgray' 'moccasin'
 
 # Gerando coordenadas aleatórias para os pontos
-num_pontos = 400
+num_pontos = 500
 tol = 150
 
 if shape == 'quadrado':
@@ -34,7 +37,7 @@ elif shape == 'circulo':
 # Criando o gráfico
 plt.figure(figsize=(9, 8))  # Ajuste o figsize para um gráfico quadrado
 # Ajuste o tamanho dos pontos aumentando o valor de 's'
-plt.scatter(x, y, color=cor, marker='.', linewidths=1, edgecolors='black', s=1400)  # Ajuste o valor de 's' conforme necessário para o tamanho dos pontos
+plt.scatter(x, y, color=cor, marker='.', linewidths=1, edgecolors='black', s=800)  # Ajuste o valor de 's' conforme necessário para o tamanho dos pontos
 plt.xlabel('X-position (m)', fontsize=tamFonteGraf, fontname=nomeFonte)
 plt.ylabel('Y-position (m)', fontsize=tamFonteGraf, fontname=nomeFonte)
 
@@ -98,3 +101,4 @@ plt.grid(False)
 plt.axis('equal')
 plt.tight_layout()  # Adicionando esta linha para ajustar o layout
 plt.savefig(f'{rootPath}/simArea_with_towers.png')
+#plt.savefig(f'{rootPath}/simArea_with_towers.eps', format='eps')

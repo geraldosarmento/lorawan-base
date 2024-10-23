@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 
+# Script para plotar gráficos com conjuntos fuzzy de entrada e saída. Utilizado para o paper do SBESC 2024
+
 def triangular(x, points):
     """Triangular membership function."""
     if x <= points[0][0] or x >= points[2][0]:

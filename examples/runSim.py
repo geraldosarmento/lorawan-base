@@ -14,8 +14,8 @@ import os
 import shutil
 import time
 
-# Ex.:  ./src/lorawan/examples/simRunner.py 0
-# Exemplo de chamada em lote: ./src/lorawan/examples/simRunner.py 3 && ./src/lorawan/examples/simRunner.py 4
+# Ex.:  ./src/lorawan/examples/runSim.py 0
+# Exemplo de chamada em lote: ./src/lorawan/examples/runSim.py 3 && ./src/lorawan/examples/runSim.py 4
 # Ex. de comando gerado: time ./ns3 run "littoral --adrType=ns3::AdrMB --simTime=86400" --quiet
 # 'Tipos de cenário: {0:'numED', 1:'sideLength', 2:'pktsPerDay', 3:'modMob', 4:'speedClass'}
 
@@ -25,7 +25,7 @@ import time
 # -= Controle Geral =- 
 tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida (Teste)
 novaSim          = True   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
-backupOutputDir  = True   # Realiza um backup local dos resultados
+backupOutputDir  = False   # Realiza um backup local dos resultados
 
 # -= Parâmetros de Simulação =-
 numRep          = 10 if (tipoExecucao == 0) else 2
@@ -37,9 +37,9 @@ simTime         = numPeriods * 24*60*60 if (tipoExecucao == 0) else 7200
 pktSize         = 30                      # 0 para usar valor default do módulo
 pktsPerDay      = 144
 appPeriod       = 86400/pktsPerDay
-modMob          = 0    
-minSpeed        = 3.5  # def: 0.5
-maxSpeed        = 6.0  # def: 1.5
+modMob          = 1    # def 1 RandomWalk    
+minSpeed        = 0.5  # def: 0.5
+maxSpeed        = 3.0  # def: 3.0
 pathLossExp     = 3.76
 areaIC          = 0.975  # área gaussina para um intervalo de confiança bilateral de 95% 
 okumura         = False
@@ -66,7 +66,7 @@ dimIdDic        = { 'dim1' : "", 'dim2' : ""  }
 trtmntLblDic    = {'numED':'Number of End Devices',  'adrType':'ADR Scheme', 'sideLength':'Side Length', 'pktsPerDay':'Packets per Day', 'mobModel':'Mobility Model', 'speedClass' : 'Speed Class'}
 trtmntDic = {
     'adrType'        : {"ns3::AdrMB":"MB-ADR", "ns3::AdrKalman":"M-ADR", "ns3::AdrLorawan":"ADR"},    
-    'mobModel'       : {'0': "Random Walk", '1': "Random Waypoint", '2':"Gauss Markov"},
+    'mobModel'       : {'0': "Constant Position", '1': "Random Walk", '2': "Steady-State Random Waypoint", '3':"Gauss-Markov"},
     'speedClass'     : {'0': "Speed Class 0", '1': "Speed Class 1", '2':"Speed Class 2"},
     'okumuraEnvrmnt' : {'0': "UrbanEnvironment", '1': "SubUrbanEnvironment", '2': "OpenAreasEnvironment"}    
 }  # A variável registrada em dim2 precisa ter uma entrada nesse dicionário
@@ -353,7 +353,7 @@ def ajustarLstCenarios(parser):
         dimIdDic['dim1'] = 'numED'
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
         dimIdDic['dim2'] = 'mobModel'
-        dimDic['dim2'] = trtmntDic['mobModel'].keys() if (tipoExecucao == 0) else list(trtmntDic['mobModel'].keys())[:2]
+        dimDic['dim2'] = trtmntDic['mobModel'].keys() if (tipoExecucao == 0) else list(trtmntDic['mobModel'].keys())[-2:]
         if (multiGw):
             dimDic['dim2'] = list(trtmntDic['mobModel'].keys())[:numTratMG]
     elif (tipoCenario == 4):
@@ -385,11 +385,14 @@ def ajustarComandoSim(mob, gw, dim1, dim2 ):
     elif (tipoCenario == 3):
         numED = dim1
         modMob = dim2
+        minSpeed = minSpeedLst[1]  #Classe de velocidade intermediária
+        maxSpeed = maxSpeedLst[1]
         adrType = adrTypeDef  # Esquema ADR default
     elif (tipoCenario == 4):
         numED = dim1
         minSpeed = minSpeedLst[int(dim2)]
         maxSpeed = maxSpeedLst[int(dim2)]
+        modMob = 2    # Fixa o modelo no Steady-State Random Waypoint
         adrType = adrTypeDef
     
     if (grafSuperf):

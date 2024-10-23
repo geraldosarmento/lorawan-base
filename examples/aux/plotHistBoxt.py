@@ -5,10 +5,13 @@ import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 import argparse
 
+# Este script necessita do arquivo 'snrMargin.csv' disponível no mesmo diretório, que consiste em (muitas) amostras representativas
+#  de valores SNR (separados por espaço) obtidos da leitura do ADR no lado servidor.
+
 noOutliers = True          # Whether outliers should be removed (or nor)
 plotGraphs = True
 tamanhoFonte = 16          # Graphics font size
-nomeFonte = 'Arial'  # def: "sans-serif"  #"Arial" #'Times New Roman' 
+nomeFonte = 'Arial'        # def: "sans-serif"  #"Arial" #'Times New Roman' 
 numBoxplots = 20           # Number of boxplots
 M = 10                     # Number of packets colleted for each ADR iteration
 
@@ -84,7 +87,7 @@ def plotar_histograma(valores, estatisticas):
     plt.yticks(fontsize=tamanhoFonte, fontname=nomeFonte)
     plt.tight_layout()
     plt.grid(False)
-    #plt.savefig("histogram.png")
+    plt.savefig("histogram.png")
     plt.savefig("histogram.eps", format='eps')
 
 def plotar_boxplot(valores):
@@ -109,7 +112,7 @@ def plotar_boxplot(valores):
     #plt.title(f'Boxplots de {numBoxplots} conjuntos aleatórios de {M} valores')
     plt.grid(True)
     plt.tight_layout()
-    #plt.savefig("boxplots.png")
+    plt.savefig("boxplots.png")
     plt.savefig("boxplots.eps", format='eps')
     
 

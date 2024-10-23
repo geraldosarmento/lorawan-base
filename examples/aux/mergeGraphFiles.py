@@ -2,6 +2,8 @@
 import os
 from PIL import Image
 
+# Combina váriaos gráficos em uma única imagem
+
 #rootPathPlot = "scratch/output/" 
 rootPathPlot = "../../../../scratch/output/"
 

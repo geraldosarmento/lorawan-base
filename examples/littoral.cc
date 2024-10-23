@@ -81,9 +81,10 @@ bool const saveToFile = true;
 
 //-- Mobility Parameters --// 
 enum mobilityModel {
-    RandomWalk                 = 0,
-    SteadyStateRandomWaypoint  = 1,
-    GaussMarkov                = 2
+    ConstantPosition            = 0,
+    RandomWalk                  = 1,
+    SteadyStateRandomWaypoint   = 2,
+    GaussMarkov                 = 3
 };
 
 double mobileNodeProbability = 1.0;
@@ -235,7 +236,10 @@ main(int argc, char* argv[])
     else {
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
         RngSeedManager::SetSeed(seed);
-    }    
+    }
+
+    if (mobModel == ConstantPosition)
+        mobileNodeProbability = 0;
     
     std::string adrTypeFile = adrType;   // ADR scheme that should be part of the output file name
 
@@ -446,9 +450,10 @@ main(int argc, char* argv[])
         Vector position = mobility->GetPosition ();
         position.z = edHeight;
         mobility->SetPosition (position);
+        //std::cout << "Nó estático : " << endDevices.Get(i)->GetId() << std::endl;
     }
-    // Install mobility model on mobile nodes
 
+    // Install mobility model on mobile nodes
     if (mobModel == RandomWalk) {
         mobilityEd.SetMobilityModel(
         "ns3::RandomWalk2dMobilityModel",
@@ -469,7 +474,7 @@ main(int argc, char* argv[])
         "MinSpeed", DoubleValue(minSpeed),
         "MaxSpeed", DoubleValue(maxSpeed),
         "MinPause", DoubleValue(0),
-        "MaxPause", DoubleValue(2.0),
+        "MaxPause", DoubleValue(5.0),
         "MinX", DoubleValue(-sideLength/2),
         "MaxX", DoubleValue(sideLength/2),
         "MinY", DoubleValue(-sideLength/2),
@@ -505,7 +510,7 @@ main(int argc, char* argv[])
         Vector position = mobility->GetPosition ();
         position.z = edHeight;
         mobility->SetPosition (position);        
-        //std::cout << "Mobilidade no nó : " << endDevices.Get(i)->GetId() << std::endl;
+        //std::cout << "Nó móvel : " << endDevices.Get(i)->GetId() << std::endl;
     }
     //std::cout << "Modelo de mobilidade aplicado : " << mobModel << std::endl;
     

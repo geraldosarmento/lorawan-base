@@ -1,23 +1,37 @@
 #!/usr/bin/python3
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 
-# Carregar o arquivo CSV com o caminho do arquivo, ignorando a primeira linha
-file_path = 'input.csv'  # Copie o arquivo deviceStatus*.csv neste diretório como input.csv
-col_names = ['col1', 'col2', 'x', 'y', 'col5', 'col6', 'col7']
-df = pd.read_csv(file_path, sep='\s+', header=None, names=col_names, skiprows=1)
+# Script para plotar em um gráfico a trajetória de n end devices segundo algum modelo de mobidade. 
+# Necessita do arquivo 'input.csv' disponível no mesmo diretório, consistindo em uma instância renomeada do arquivo 'deviceStatus-x'
 
-# Definir o tamanho e o nome da fonte
-tamanhoFonte = 18          # Tamanho da fonte do gráfico
-nomeFonte = 'Arial'        # Nome da fonte: "Arial"
+# Carregar o arquivo CSV
+file_path = 'input.csv'
+col_names = ['tempo', 'id', 'x', 'y', 'col5', 'col6', 'col7']
+df = pd.read_csv(file_path, sep='\s+', header=None, names=col_names)
 
-# Extrair as coordenadas x e y
-x = df['x']
-y = df['y']
+# Definir o tamanho da fonte e o nome da fonte
+tamanhoFonte = 18
+nomeFonte = 'Arial'
 
-# Criar o gráfico da trajetória
+# Obter os IDs únicos dos dispositivos
+device_ids = df['id'].unique()
+
+# Usar a paleta de cores 'Set1', removendo a cor verde
+set1_colors = list(plt.get_cmap('Set1').colors)
+colors_without_green = [color for i, color in enumerate(set1_colors) if (i != 2) and (i != 3)]  # Remove o terceiro (verde)
+
+# Criar a figura
 plt.figure(figsize=(8, 6))
-plt.plot(x, y, color='blue', linestyle='-')
+
+# Traçar a trajetória de cada dispositivo com uma cor diferente
+for i, device_id in enumerate(device_ids):
+    device_data = df[df['id'] == device_id]
+    plt.plot(device_data['x'], device_data['y'], color=colors_without_green[i % len(colors_without_green)], linestyle='-', label=f'ED {device_id}')
+
+# Adicionar rótulos e grade
 plt.xlabel('X-position (m)', fontsize=tamanhoFonte, fontname=nomeFonte)
 plt.ylabel('Y-position (m)', fontsize=tamanhoFonte, fontname=nomeFonte)
 plt.grid(True)
@@ -26,14 +40,14 @@ plt.grid(True)
 plt.xlim(-50, 50)
 plt.ylim(-50, 50)
 
-# Configurar os ticks (marcações) nos eixos x e y para incluir -50 e 50
-plt.xticks(range(-50, 51, 10))  # Ticks no eixo x de -50 a 50 com passo de 10
-plt.yticks(range(-50, 51, 10))  # Ticks no eixo y de -50 a 50 com passo de 10
+# Definir ticks nos eixos
+plt.xticks(range(-50, 51, 10), fontsize=tamanhoFonte, fontname=nomeFonte)
+plt.yticks(range(-50, 51, 10), fontsize=tamanhoFonte, fontname=nomeFonte)
 
-plt.xticks(fontsize=tamanhoFonte, fontname=nomeFonte)
-plt.yticks(fontsize=tamanhoFonte, fontname=nomeFonte)
+# Adicionar legenda
+plt.legend()
+
+# Salvar o gráfico como 'map.png'
 plt.tight_layout()
-
-
 plt.savefig("map.png")
 plt.savefig("map.eps", format='eps')
