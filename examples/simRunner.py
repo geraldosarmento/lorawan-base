@@ -23,12 +23,12 @@ import time
 # - 
 
 # -= Controle Geral =- 
-tipoExecucao     = 0      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida (Teste)
+tipoExecucao     = 1      # Tipos:  0 - Simulação Completa | 1 - Simulação Rápida (Teste)
 novaSim          = True   # True: executa um novo ciclo de simulações | False: atualiza dados e gráficos de um ciclo anterior (exige dados na pasta outputPath)
 backupOutputDir  = True   # Realiza um backup local dos resultados
 
 # -= Parâmetros de Simulação =-
-numRep          = 10 if (tipoExecucao == 0) else 3
+numRep          = 10 if (tipoExecucao == 0) else 2
 sideLength      = 10000
 areaCirc        = False
 numPeriods      = 1   #  1.125: whether consider warming time
@@ -46,7 +46,7 @@ okumura         = False
 okumuraEnvrmnt  = 0      # 0: UrbanEnvironment, 1: SubUrbanEnvironment, 2: OpenAreasEnvironment. Só tem efeito quando 'okumura = "true" '
 modoConfirm     = False   # Caso True, ativa-se o modo confirmado e utiliza-se a métrica CPSR
 mobility        = True
-multiGw         = True
+multiGw         = False
 numTratMG       = 3       # Quantos tratamentos usar em dim2 em um cenário multiGw. Recomendado usar entre 2 e 4 (para não explodir o número de simulações)
 
 
@@ -333,31 +333,36 @@ def ajustarLstCenarios(parser):
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
         dimIdDic['dim2'] = 'adrType'
         dimDic['dim2'] = trtmntDic['adrType'].keys() if (tipoExecucao == 0) else list(trtmntDic['adrType'].keys())[:2]
-        dimDic['dim2'] = list(trtmntDic['adrType'].keys())[:numTratMG] if (multiGw) else None
+        if (multiGw):
+            dimDic['dim2'] = list(trtmntDic['adrType'].keys())[:numTratMG]
     elif (tipoCenario == 1):
         dimIdDic['dim1'] = 'sideLength'
         dimDic['dim1'] = sideLengthLst if (tipoExecucao == 0) else sideLengthLst[-2:]
         dimIdDic['dim2'] = 'adrType'
         dimDic['dim2'] = trtmntDic['adrType'].keys() if (tipoExecucao == 0) else list(trtmntDic['adrType'].keys())[:2]
-        dimDic['dim2'] = list(trtmntDic['adrType'].keys())[:numTratMG] if (multiGw) else None
+        if (multiGw):
+            dimDic['dim2'] = list(trtmntDic['adrType'].keys())[:numTratMG]
     elif (tipoCenario == 2):
         dimIdDic['dim1'] = 'pktsPerDay'
         dimDic['dim1'] = pktsPerDayLst if (tipoExecucao == 0) else pktsPerDayLst[-2:]
         dimIdDic['dim2'] = 'adrType'
         dimDic['dim2'] = trtmntDic['adrType'].keys() if (tipoExecucao == 0) else list(trtmntDic['adrType'].keys())[:2]
-        dimDic['dim2'] = list(trtmntDic['adrType'].keys())[:numTratMG] if (multiGw) else None
+        if (multiGw):
+            dimDic['dim2'] = list(trtmntDic['adrType'].keys())[:numTratMG]
     elif (tipoCenario == 3):
         dimIdDic['dim1'] = 'numED'
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
         dimIdDic['dim2'] = 'mobModel'
         dimDic['dim2'] = trtmntDic['mobModel'].keys() if (tipoExecucao == 0) else list(trtmntDic['mobModel'].keys())[:2]
-        dimDic['dim2'] = list(trtmntDic['mobModel'].keys())[:numTratMG] if (multiGw) else None
+        if (multiGw):
+            dimDic['dim2'] = list(trtmntDic['mobModel'].keys())[:numTratMG]
     elif (tipoCenario == 4):
         dimIdDic['dim1'] = 'numED'
         dimDic['dim1'] = numEDLst if (tipoExecucao == 0) else numEDLst[1:4]
         dimIdDic['dim2'] = 'speedClass'
         dimDic['dim2'] = trtmntDic['speedClass'].keys() if (tipoExecucao == 0) else list(trtmntDic['speedClass'].keys())[:2]
-        dimDic['dim2'] = list(trtmntDic['speedClass'].keys())[:numTratMG] if (multiGw) else None
+        if (multiGw):
+            dimDic['dim2'] = list(trtmntDic['speedClass'].keys())[:numTratMG]
 
     if (grafSuperf):        
         dimIdDic['dim1'] = 'numED'
