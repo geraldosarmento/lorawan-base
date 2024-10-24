@@ -44,8 +44,8 @@ plt.ylim(-50, 50)
 plt.xticks(range(-50, 51, 10), fontsize=tamanhoFonte, fontname=nomeFonte)
 plt.yticks(range(-50, 51, 10), fontsize=tamanhoFonte, fontname=nomeFonte)
 
-# Adicionar legenda
-plt.legend()
+# Adicionar legenda com fonte personalizada e caixa semitransparente
+plt.legend(prop={'size': tamanhoFonte-2, 'family': nomeFonte}, framealpha=0.7, facecolor='white')
 
 # Salvar o gráfico como 'map.png'
 plt.tight_layout()

@@ -148,9 +148,9 @@ def executarSim():
                 for dim2 in dimDic['dim2']:                    
                     for rep in range(numRep):
                         numTotRod = len(mobDic)*len(gwDic)*len(dimDic['dim1'])*len(dimDic['dim2'])*numRep
-                        print("=============================================================================================================")
+                        print("=====================================================================================")
                         print(f"   Ensaio: {dimIdDic['dim1']}={dim1} | {dimIdDic['dim2']}={dim2} - NumGw: {gw} - Mob.:{'Sim' if (float(mob)>0) else 'Não'} - Rep: {rep+1} - Rodada: {rodCont} de {numTotRod}")
-                        print("=============================================================================================================")
+                        print("=====================================================================================")
                         cmd = ajustarComandoSim(mob, gw, dim1, dim2)
                         print (f"Comando submetido: {cmd}")
                         print (f"Executando simulação...")
